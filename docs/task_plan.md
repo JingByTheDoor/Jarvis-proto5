@@ -19,11 +19,10 @@
 
 ## Phase 0 Status
 
-- `Phase 0A`: in progress
+- `Phase 0A`: complete
 - `Phase 0`: open
 
 ## Remaining Phase 0 Blockers
 
 - Platform-backed encrypted-at-rest implementation and verification tests for logs, memory, caches, and sensitive settings.
 - Any remaining named hardening cases not covered by the current contract-only slice.
-
