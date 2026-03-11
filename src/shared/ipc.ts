@@ -96,8 +96,12 @@ export const IpcEnvelopeSchema = z.discriminatedUnion("channel", [
 ]);
 
 export type IpcEnvelope = z.infer<typeof IpcEnvelopeSchema>;
+export type TaskIntentRequest = z.infer<typeof TaskIntentRequestSchema>;
+export type TaskIntentResponse = z.infer<typeof TaskIntentResponseSchema>;
+export type PolicySnapshotRequest = z.infer<typeof PolicySnapshotRequestSchema>;
+export type PolicySnapshotResponse = z.infer<typeof PolicySnapshotResponseSchema>;
+export type RunEventEnvelope = z.infer<typeof RunEventEnvelopeSchema>;
 
 export function parseIpcEnvelope(input: unknown): IpcEnvelope {
   return IpcEnvelopeSchema.parse(input);
 }
-

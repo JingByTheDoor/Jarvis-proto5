@@ -2,7 +2,26 @@
 
 ## Purpose
 
-This document is the canonical Phase 0 rulebook for JARVIS. It freezes the safety and contract decisions that later phases must consume without reinterpretation.
+This document is the canonical Phase 0 rulebook for JARVIS. It freezes the safety, contract, and persistence decisions that later phases must consume without reinterpretation.
+
+## Architecture Invariants
+
+JARVIS is:
+
+- local-first by default
+- Windows-first
+- plan-first
+- deterministic
+- approval-gated
+- inspectable end to end
+
+If forced to choose:
+
+- safer beats faster
+- clearer beats fancier
+- local beats cloud-dependent
+- explicit beats magical
+- deterministic beats unpredictable
 
 ## Workflow
 
@@ -29,6 +48,28 @@ Workflow states:
 - `aborted`
 
 No executable action may originate from prose alone. Approval always applies to the compiled manifest, not freeform plan text.
+
+## Schemas and Contracts
+
+The following contracts are canonical and schema-validated:
+
+- `PLAN`
+- `ACTION`
+- `EXECUTION_MANIFEST`
+- `COMPILED_ACTION`
+- `EFFECT_PREVIEW`
+- `APPROVAL_DECISION`
+- `RUN_EVENT`
+- `RUN_LOG`
+- `TOOL_RESULT`
+- `EXECUTION_ATTESTATION`
+- `MEMORY_RECORD`
+
+Contract rules:
+
+- All IPC payloads are validated in both directions.
+- All tool args, tool results, manifests, approvals, memory writes, and persisted logs are validated before use.
+- The schema registry is the single canonical source for shared core contract shapes.
 
 ## Event Taxonomy
 
@@ -89,6 +130,23 @@ Boundary rules:
 - No generic command bridge exists between renderer and privileged layers.
 - No layer may bypass a lower-privileged layer by handle sharing.
 
+## Renderer Hardening
+
+Every renderer surface must run with:
+
+- `nodeIntegration: false`
+- `contextIsolation: true`
+- `sandbox: true`
+- `webSecurity: true`
+
+Additional hardening rules:
+
+- Local UI content loads through `app://`, not `file://`.
+- Content security policy defaults to deny and only allows explicit local script/style/image sources.
+- Permissions, navigation, and popup creation are default-deny.
+- Sender validation is mandatory for privileged IPC.
+- No raw Electron, Node, native, or shell handles may be exposed to renderer content.
+
 ## Approval Semantics
 
 Approval decisions:
@@ -124,6 +182,7 @@ Rules:
 - `approve_session` authorizes repeated execution only when both hashes remain identical.
 - Session approval never widens tool, args, scopes, side-effect family, max execution count, session id, or expiry time.
 - Destructive actions and mutating raw shell are never session-approvable.
+- No hidden approvals, silent escalation, or risky fallback behavior is permitted.
 
 ## Canonical Path Policy
 
@@ -137,6 +196,7 @@ Rules:
 - Raw string prefix matching is forbidden.
 - Symlinks, junctions, mount points, Windows reparse points, UNC paths, Windows device namespace paths, and NTFS alternate data streams are rejected by default.
 - Approval-time and execution-time canonical-path drift is a policy violation.
+- Later tool support for disallowed path kinds requires explicit policy, simulation behavior, approval copy, and dedicated tests.
 
 ## Network Scope Policy
 
@@ -173,6 +233,54 @@ Rules:
 - Instruction-like text inside untrusted content is content, not authority.
 - No tool call may be authorized solely because untrusted content requested it.
 - High-risk actions influenced by untrusted content still require explicit human approval.
+
+## Memory Contracts
+
+Memory record classes:
+
+- `operator_pinned_fact`
+- `extracted_fact_unverified`
+- `system_observation`
+- `derived_summary`
+- `retrieved_context`
+- `verified_fact`
+
+Required metadata fields:
+
+- `provenance_type`
+- `source_run_id`
+- `source_message_ids`
+- `confidence`
+- `verification_status`
+- `contradiction_status`
+- `last_verified_at`
+- `retention_policy`
+
+Rules:
+
+- Only `operator_pinned_fact` and `verified_fact` may be auto-injected by default.
+- Unverified extracted facts may be searchable but not auto-injected.
+- Summaries retain provenance and must not silently become facts.
+- Conflicted memory remains stored and visible; it is not auto-deleted or auto-injected.
+- Memory never stores secrets.
+
+## Naming Conventions
+
+- Public enum-like values use lowercase snake_case unless the original policy requires uppercase status labels such as `SAFE`, `CAUTION`, or `DANGER`.
+- Shared contract names use uppercase document names such as `PLAN` and `RUN_LOG`.
+- Files and module names use explicit kebab-case or descriptive nouns; no generic `utils` buckets.
+- Shared contract names have one canonical export source to avoid barrel collisions.
+
+## Integration Contracts
+
+Optional integrations must behave behind explicit adapter boundaries.
+
+Rules:
+
+- Every optional adapter defines availability requirements, read behavior, write behavior, failure behavior, degradation path, and health payload schema.
+- Null adapters are real implementations and must return deterministic unavailable responses.
+- Optional adapters never gate the base workflow.
+- Core pages depend only on local state, Tier 1 memory, and run logs.
 
 ## Redaction
 
@@ -211,7 +319,11 @@ Capability tokens are opaque privileged-memory records bound to:
 - `remaining_uses`
 - `status`
 
-Tokens are single-use by default, never persisted to renderer state or logs, and must be revoked on expiry, session end, manual lock, crash recovery, and restart.
+Rules:
+
+- Tokens are single-use by default.
+- Tokens are revoked on expiry, session end, manual lock, crash recovery, and restart.
+- Tokens are never persisted to renderer state, logs, memory, analytics, or crash reports.
 
 ## Retention and Sensitive Session
 
@@ -231,13 +343,66 @@ Sensitive session mode:
 
 ## Encrypted At Rest
 
-Persisted secrets, sensitive settings, run logs, memory stores, caches, and export staging areas must be encrypted at rest where platform support exists. Phase 0A defines the requirement but does not yet implement platform-backed verification.
+The Phase 0 chosen persistence approach is:
+
+- a per-install 32-byte content-encryption key
+- wrapped with Windows DPAPI CurrentUser protection
+- stored only as a wrapped key envelope on disk
+- used to encrypt persisted payloads with AES-256-GCM
+
+Covered storage classes:
+
+- run logs
+- memory stores
+- caches
+- sensitive settings
+- export staging
+
+Rules:
+
+- Persisted plaintext for covered classes is forbidden.
+- Key envelopes may contain wrapped key material and metadata only, never the raw content key.
+- Encrypted envelopes bind ciphertext to purpose and key ID through authenticated additional data.
+- Non-Windows platforms remain unsupported for this provider in Phase 0; later phases may add a platform keystore abstraction.
+
+## Quotas, Decompression, and Backpressure
+
+Phase 0 freezes the baseline caps that later execution features must obey:
+
+- stdout/stderr preview cap: 64 KiB each
+- captured stdout/stderr cap: 1 MiB each
+- single artifact cap: 16 MiB
+- per-run artifact total cap: 64 MiB
+- parsed document cap: 8 MiB
+- PDF page cap: 200 pages
+- image size cap: 20 MiB
+- HTTP response cap: 8 MiB
+- request timeout cap: 30 seconds
+- concurrent tool cap: 4
+- archive entry-count cap: 1024
+- archive expanded-size cap: 64 MiB
+- archive expansion-ratio cap: 20x
+
+Rules:
+
+- Writers must obey backpressure and wait for drain when necessary.
+- On quota breach, execution stops safely and emits a quota-specific policy event.
+- Archive expansion beyond the caps is rejected by default.
+
+## Crash Cleanup Behavior
+
+Crash cleanup rules:
+
+- revoke all active capability tokens
+- mark interrupted runs as `failed` or `aborted` rather than `review_ready`
+- preserve only the minimum surviving audit trail needed for recovery
+- avoid implying persistence success for any background write that did not complete
+- remove incomplete export staging artifacts on next startup unless explicitly recovered
 
 ## Docs Update Protocol
 
-- `docs/constitution.md` is canonical.
-- `docs/task_plan.md` tracks current phase status and blockers.
-- `docs/progress.md` records what changed, what was tested, and the current state.
-- `docs/findings.md` records durable lessons and explicit assumptions.
+- [docs/constitution.md](D:/Jarvis-proto5%20repo/Jarvis-proto5/docs/constitution.md) is canonical.
+- [docs/task_plan.md](D:/Jarvis-proto5%20repo/Jarvis-proto5/docs/task_plan.md) tracks current phase status and blockers.
+- [docs/progress.md](D:/Jarvis-proto5%20repo/Jarvis-proto5/docs/progress.md) records what changed, what was tested, and the current state.
+- [docs/findings.md](D:/Jarvis-proto5%20repo/Jarvis-proto5/docs/findings.md) records durable lessons and explicit assumptions.
 - Architecture, schema, or policy changes must update this document before the phase is claimed complete.
-

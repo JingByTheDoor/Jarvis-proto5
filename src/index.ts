@@ -4,6 +4,7 @@ export * from "./core/approval/hashes";
 export * from "./core/capabilities/canonical-path-policy";
 export * from "./core/capabilities/contracts";
 export * from "./core/capabilities/network-scope-policy";
+export * from "./core/persistence/encrypted-at-rest";
 export * from "./core/planning/untrusted-content";
 export * from "./core/redaction/redactor";
 export * from "./core/schemas";

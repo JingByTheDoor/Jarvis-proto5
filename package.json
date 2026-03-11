@@ -3,18 +3,34 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "main": "dist/main/index.js",
   "scripts": {
+    "build": "npm run build:renderer && npm run build:main && npm run build:preload",
+    "build:main": "esbuild src/main/index.ts --bundle --platform=node --format=esm --target=node20 --external:electron --outfile=dist/main/index.js",
+    "build:preload": "esbuild src/preload/index.ts --bundle --platform=node --format=esm --target=node20 --external:electron --outfile=dist/preload/index.js",
+    "build:renderer": "vite build",
+    "smoke:electron": "npm run build && electron dist/main/index.js --smoke-test",
+    "start": "npm run build && electron dist/main/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "zod": "^4.1.11"
   },
   "devDependencies": {
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^24.6.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.4",
+    "electron": "^41.0.0",
+    "esbuild": "^0.27.3",
+    "jsdom": "^28.1.0",
     "typescript": "^5.9.3",
+    "vite": "^7.3.1",
     "vitest": "^3.2.4"
   }
 }
-
