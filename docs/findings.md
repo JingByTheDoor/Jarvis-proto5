@@ -26,3 +26,12 @@
 - The renderer-facing desktop API is a higher-level contract than Electron's raw `(event, payload)` listener shape; test stubs need to emit validated `RunEvent` objects directly or the Command Center event feed will fail on undefined `kind`.
 - Phase 4 needs an explicit persistence-failure path: a run can execute and attest correctly while run-log persistence fails, and the UI must keep the result visible without falsely promoting the state to `review_ready`.
 - Artifact visibility matters for reviewability even in the narrow slice; showing persisted run paths and artifact locations in the default review surfaces keeps the operator loop inspectable without adding a larger dashboard.
+- Strict substring matching makes previous-task recall feel worse than it is; token-based matching is enough to recover useful runs like `safe run` where one token lives in the run id and the other in the run summary.
+- Read-only guarded shell should remain `CAUTION`; low-confidence simulation should only auto-escalate to `DANGER` when write, delete, remote, or system effects are still possible.
+- Empty temp repos need `git commit --allow-empty` in fixtures so guarded-shell and recall tests stay deterministic on machines without preexisting repo content.
+- The current operator-note lookup intentionally scans local `notes/**` and `docs/**` `.md` / `.txt` files whose path indicates note-like content; this keeps recall useful without adding a persistent index or broad noisy search.
+- Phase 5 duplicates some run identifiers across run-history and recall cards by design, so renderer assertions need to anchor on explicit copy or region scope instead of assuming global unique text.
+- Local proof-gate metrics are best treated as first-party operational evidence, not as Tier 3 analytics; they should stay local, encrypted, and tightly scoped until optional analytics exists.
+- Workflow-proof storage should avoid raw task text entirely; route, workflow state, timestamps, manifest/run ids, resume use, and step/click counts are enough to prove friction and stability without increasing secret risk.
+- The first live `RUN_EVENT` is a better proxy for "first result" than the final execution response because it measures when the operator sees activity, not when the full run finishes.
+- A recorded `deny` receipt must not unlock the Execute button; otherwise the UI would overstate workflow success and corrupt the proof-gate metrics.

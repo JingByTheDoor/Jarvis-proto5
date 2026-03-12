@@ -15,10 +15,12 @@ import type { JarvisDesktopApi } from "../../src/shared/desktop-api";
 import { workflowSequence } from "../../src/shared/constants";
 import {
   validApprovalDecisionResponse,
+  validRecallSearchResponse,
   validRunEvent,
   validRunExecutionResponse,
   validRunHistoryResponse,
-  validTaskIntentResponseEnvelope
+  validTaskIntentResponseEnvelope,
+  validWorkflowProofSummaryResponse
 } from "../fixtures";
 
 function createDesktopApiStub(): JarvisDesktopApi {
@@ -26,7 +28,7 @@ function createDesktopApiStub(): JarvisDesktopApi {
     async () => validTaskIntentResponseEnvelope.payload
   ) as unknown as JarvisDesktopApi["submitTaskIntent"];
   const getPolicySnapshot = vi.fn(async () => ({
-    version: "phase-4-execution",
+    version: "phase-6-proof-gate",
     workflow: workflowSequence,
     local_first: true as const,
     approval_required_for_risky_actions: true as const
@@ -37,6 +39,9 @@ function createDesktopApiStub(): JarvisDesktopApi {
     submitApprovalDecision: vi.fn(async () => validApprovalDecisionResponse),
     executeManifest: vi.fn(async () => validRunExecutionResponse),
     listRunHistory: vi.fn(async () => validRunHistoryResponse),
+    searchLocalRecall: vi.fn(async () => validRecallSearchResponse),
+    recordWorkflowProof: vi.fn(async (payload) => payload),
+    getWorkflowProofSummary: vi.fn(async () => validWorkflowProofSummaryResponse),
     getPolicySnapshot,
     subscribeToRunEvents: vi.fn(() => () => {})
   };
@@ -105,7 +110,7 @@ function createEditDesktopApiStub(): JarvisDesktopApi {
         approval_signature: "approval-signature-1",
         execution_hash: "execution-hash-1",
         max_execution_count: 1,
-        session_id: "phase-4-execution",
+        session_id: "phase-6-proof-gate",
         expires_at: "2026-03-11T20:00:00.000Z",
         path_scope: {
           roots: ["D:\\Jarvis-proto5 repo\\Jarvis-proto5"],
@@ -158,12 +163,15 @@ function createEditDesktopApiStub(): JarvisDesktopApi {
     submitApprovalDecision: vi.fn(async () => ({
       ...validApprovalDecisionResponse,
       manifest_id: "manifest-1",
-      session_id: "phase-4-execution"
+      session_id: "phase-6-proof-gate"
     })),
     executeManifest: vi.fn(async () => validRunExecutionResponse),
     listRunHistory: vi.fn(async () => validRunHistoryResponse),
+    searchLocalRecall: vi.fn(async () => validRecallSearchResponse),
+    recordWorkflowProof: vi.fn(async (payload) => payload),
+    getWorkflowProofSummary: vi.fn(async () => validWorkflowProofSummaryResponse),
     getPolicySnapshot: vi.fn(async () => ({
-      version: "phase-4-execution",
+      version: "phase-6-proof-gate",
       workflow: workflowSequence,
       local_first: true as const,
       approval_required_for_risky_actions: true as const
@@ -178,7 +186,7 @@ function createExecutingDesktopApiStub(): JarvisDesktopApi {
   const submitTaskIntent = vi.fn(async () => ({
     ...(await editDesktopApi.submitTaskIntent({
       task: "Preview and execute a typed repo edit.",
-      session_id: "phase-4-execution",
+      session_id: "phase-6-proof-gate",
       workspace_roots: ["D:\\Jarvis-proto5 repo\\Jarvis-proto5"],
       requested_at: "2026-03-11T18:00:00.000Z"
     }))
@@ -189,15 +197,18 @@ function createExecutingDesktopApiStub(): JarvisDesktopApi {
     submitApprovalDecision: vi.fn(async () => ({
       ...validApprovalDecisionResponse,
       manifest_id: "manifest-1",
-      session_id: "phase-4-execution"
+      session_id: "phase-6-proof-gate"
     })),
     executeManifest: vi.fn(async () => {
       runEventListener?.(validRunEvent);
       return validRunExecutionResponse;
     }),
     listRunHistory: vi.fn(async () => validRunHistoryResponse),
+    searchLocalRecall: vi.fn(async () => validRecallSearchResponse),
+    recordWorkflowProof: vi.fn(async (payload) => payload),
+    getWorkflowProofSummary: vi.fn(async () => validWorkflowProofSummaryResponse),
     getPolicySnapshot: vi.fn(async () => ({
-      version: "phase-4-execution",
+      version: "phase-6-proof-gate",
       workflow: workflowSequence,
       local_first: true as const,
       approval_required_for_risky_actions: true as const
@@ -216,7 +227,7 @@ afterEach(() => {
   delete window.jarvisDesktop;
 });
 
-describe("Phase 4 renderer shell", () => {
+describe("Phase 6 renderer shell", () => {
   it(
     "renders the Command Center preview surfaces for route, simulation, manifest, and diff",
     async () => {
@@ -224,7 +235,7 @@ describe("Phase 4 renderer shell", () => {
 
     render(<JarvisApp />);
 
-    await screen.findByText("phase-4-execution");
+    await screen.findByText("phase-6-proof-gate");
     expect(screen.getByRole("heading", { name: /shortest safe path from task to review/i })).toBeDefined();
     expect(screen.getByLabelText(/task composer \/ input/i)).toBeDefined();
     expect(screen.getByRole("button", { name: "Preview" })).toBeDefined();
@@ -269,7 +280,7 @@ describe("Phase 4 renderer shell", () => {
 
     render(<JarvisApp />);
 
-    await screen.findByText("phase-4-execution");
+    await screen.findByText("phase-6-proof-gate");
     fireEvent.click(screen.getByRole("button", { name: "Show details" }));
 
     expect(screen.getByRole("heading", { name: /progressive disclosure surfaces/i })).toBeDefined();
@@ -281,11 +292,11 @@ describe("Phase 4 renderer shell", () => {
     expect(
       screen.getByRole("heading", { name: /operational history stays grouped by outcome/i })
     ).toBeDefined();
-    expect(screen.getByText("run-1")).toBeDefined();
+    expect(screen.getByText("Latest run run-1 is review_ready.")).toBeDefined();
 
     fireEvent.click(screen.getByRole("button", { name: /Second Brain/i }));
     expect(
-      screen.getByRole("heading", { name: /memory visibility without memory writes yet/i })
+      screen.getByRole("heading", { name: /local recall stays useful before full memory hardening/i })
     ).toBeDefined();
 
     fireEvent.click(screen.getByRole("button", { name: /^Connections/i }));
@@ -297,6 +308,7 @@ describe("Phase 4 renderer shell", () => {
     expect(
       screen.getByRole("heading", { name: /retention, approval, and session posture stay explicit/i })
     ).toBeDefined();
+    expect(screen.getByText(/1 of 1 golden workflow attempt\(s\) reached review_ready/i)).toBeDefined();
     },
     15000
   );
@@ -308,7 +320,7 @@ describe("Phase 4 renderer shell", () => {
 
     render(<JarvisApp />);
 
-    await screen.findByText("phase-4-execution");
+    await screen.findByText("phase-6-proof-gate");
     fireEvent.click(screen.getByRole("button", { name: "Preview" }));
 
     await waitFor(() => {
@@ -335,7 +347,7 @@ describe("Phase 4 renderer shell", () => {
 
     render(<JarvisApp />);
 
-    await screen.findByText("phase-4-execution");
+    await screen.findByText("phase-6-proof-gate");
     fireEvent.click(screen.getByRole("button", { name: "Preview" }));
 
     await waitFor(() => {
@@ -370,7 +382,7 @@ describe("Phase 4 renderer shell", () => {
 
     render(<JarvisApp />);
 
-    await screen.findByText("phase-4-execution");
+    await screen.findByText("phase-6-proof-gate");
     fireEvent.click(screen.getByRole("button", { name: "Preview" }));
 
     await waitFor(() => {
@@ -399,8 +411,38 @@ describe("Phase 4 renderer shell", () => {
     expect(screen.getByText("plan_ready")).toBeDefined();
     expect(desktopApi.executeManifest).toHaveBeenCalledWith({
       manifest_id: "manifest-1",
-      session_id: "phase-4-execution"
+      session_id: "phase-6-proof-gate"
     });
+    expect(desktopApi.recordWorkflowProof).toHaveBeenCalled();
+    },
+    15000
+  );
+
+  it(
+    "resumes a previous task from local recall into the Command Center composer",
+    async () => {
+      window.jarvisDesktop = createDesktopApiStub();
+
+      render(<JarvisApp />);
+
+      await screen.findByText("phase-6-proof-gate");
+      fireEvent.click(screen.getByRole("button", { name: /Tasks & Projects/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Resume task" })).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Resume task" }));
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole("heading", { name: /shortest safe path from task to review/i })
+        ).toBeDefined();
+      });
+
+      expect(
+        (screen.getByLabelText(/task composer \/ input/i) as HTMLTextAreaElement).value
+      ).toContain("Resume the previous task from run-1");
     },
     15000
   );

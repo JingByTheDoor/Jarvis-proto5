@@ -66,8 +66,8 @@ export const localRepoToolNames = [
 
 export type LocalRepoToolName = (typeof localRepoToolNames)[number];
 
-export interface ToolDefinition<TArgs> {
-  readonly tool_name: LocalRepoToolName;
+export interface ToolDefinition<TArgs, TToolName extends string = LocalRepoToolName> {
+  readonly tool_name: TToolName;
   readonly risk_floor: RiskLevel;
   readonly side_effect_family: SideEffectFamily;
   readonly supports_simulation: boolean;

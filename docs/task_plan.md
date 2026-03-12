@@ -2,20 +2,21 @@
 
 ## Current Focus
 
-- Phase 5: guarded commands + basic memory search
+- Phase 6 Slice A: local proof-gate measurement for the golden workflow.
 
 ## Scope
 
-- Add `shell_command_guarded` as an audited escape hatch when no typed tool exists.
-- Add previous run/task search and minimal local notes lookup.
-- Improve resume-previous-task continuity without introducing Tier 2 or Tier 3 dependencies.
-- Keep typed-tool precedence, approval gating, and local-first determinism intact while broadening the operator loop.
+- Persist local workflow-proof records for the golden workflow under encrypted local storage.
+- Track task-to-preview latency, approval-to-first-result latency, execute-to-first-result latency, and operator steps/clicks.
+- Track whether resume-from-recall is being used and whether resumed journeys reach `review_ready`.
+- Surface proof-gate summary data in the UI without broadening routing, memory tiers, or optional providers.
+- Keep advanced routing, durable memory, challenger logic, and optional adapters blocked behind the proof gate from the master sheet.
 
 ## Explicit Deferrals
 
-- Routing sophistication beyond the v1 local-first profile remains deferred.
-- Advanced routing, optional systems, Tier 2 memory, and Tier 3 analytics remain deferred until the first golden workflow is measurably faster than the DIY stack.
-- Optional adapters and deeper memory tiers remain deferred until the first golden workflow is measurably faster than the DIY stack.
+- Advanced routing remains deferred until the Phase 6 proof gate is satisfied.
+- Tier 1 durable memory hardening, Tier 2 semantic memory, Tier 3 analytics, challenger logic, and optional adapters remain deferred until the first golden workflow is measurably faster than the DIY stack.
+- Quota expansion, decompression controls, and backpressure broadening remain deferred until the optional-systems phase opens.
 
 ## Completed Phases
 
@@ -25,6 +26,7 @@
 - `Phase 2`: complete
 - `Phase 3`: complete
 - `Phase 4`: complete
+- `Phase 5`: complete
 
 ## Phase 1 Closure Notes
 
@@ -54,3 +56,15 @@
 - Structured `RUN_EVENT` streaming, encrypted run-log persistence under `.tmp/runs`, and narrow typed-tool attestation now exist for the first golden workflow.
 - Review surfaces now show live activity, run results, artifact visibility, attestation outcomes, and persisted run history with approval/attestation counts.
 - Execution no longer implies persistence success: when run-log persistence fails, the execution result and attestation remain visible but the workflow falls back to `execution_complete` instead of falsely claiming `review_ready`.
+
+## Phase 5 Closure Notes
+
+- `shell_command_guarded` now exists as an audited local escape hatch with typed-tool precedence, explicit approval gating, structured receipts, and exact attestation against the compiled command.
+- Previous-task recall now searches local run history plus operator notes, preserves provenance/trust labels, redacts searchable content, and exposes resume-task entry points in the UI.
+- The Command Center, Tasks & Projects, and Second Brain now make the execution path, guarded-shell posture, local recall results, and resume flow legible without introducing Tier 2 or Tier 3 dependencies.
+
+## Phase 6 Slice A Notes
+
+- Workflow-proof records now persist locally with encrypted-at-rest storage so the current golden workflow can be measured before broader expansion.
+- The app now tracks task-to-preview latency, approval-to-first-result latency, execute-to-first-result latency, operator steps/clicks, and resume usage for local proof only.
+- Settings now shows the current proof-gate summary and recent local proof samples, while advanced routing and optional systems remain deferred.

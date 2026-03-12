@@ -267,6 +267,31 @@ Rules:
 - Conflicted memory remains stored and visible; it is not auto-deleted or auto-injected.
 - Memory never stores secrets.
 
+## Local Recall
+
+Local recall remains local-first and non-blocking.
+
+Rules:
+
+- Previous-task recall may use persisted run logs plus local operator notes only.
+- Recalled entries must preserve provenance labels and trust labels.
+- Searchable recall is redacted before it becomes searchable or renderer-visible.
+- Searchable recall never stores secrets.
+- Resume-from-recall may seed the task composer with prior context, but it never authorizes tools or bypasses approval.
+- Tier 2 semantic memory and Tier 3 analytics remain optional and non-blocking; the core recall loop must still work without them.
+
+## Workflow Proof Gate
+
+Phase 6 starts with local workflow-proof measurement before broader expansion.
+
+Rules:
+
+- Workflow-proof records are first-party local operational evidence, not optional Tier 3 analytics.
+- Workflow-proof records may store route, workflow state, timestamps, manifest/run ids, resume usage, and step/click counts only.
+- Raw task text, secrets, and provider credentials never enter workflow-proof storage.
+- Workflow-proof records remain encrypted at rest under the local cache storage class.
+- Advanced routing, durable memory, challenger logic, Tier 2 memory, Tier 3 analytics, and optional providers remain blocked until the local proof gate shows the golden workflow is stable and low-friction.
+
 ## Naming Conventions
 
 - Public enum-like values use lowercase snake_case unless the original policy requires uppercase status labels such as `SAFE`, `CAUTION`, or `DANGER`.
@@ -284,6 +309,19 @@ Rules:
 - Null adapters are real implementations and must return deterministic unavailable responses.
 - Optional adapters never gate the base workflow.
 - Core pages depend only on local state, Tier 1 memory, and run logs.
+
+## Guarded Shell
+
+`shell_command_guarded` exists only as an audited escape hatch.
+
+Rules:
+
+- Typed tools take precedence; if a sufficient typed tool exists, guarded shell is not allowed as a bypass.
+- Read-only guarded shell remains `CAUTION` and approval-gated.
+- Mutating guarded shell is `DANGER` and never session-approvable.
+- Every compiled guarded-shell action must declare the exact command text, working directory, environment policy, path scope, network scope, and expected side effects.
+- Guarded-shell execution must emit a structured receipt that is sufficient for review and attestation.
+- Repeated guarded-shell patterns should be promoted into typed tools instead of normalized into the default workflow.
 
 ## Redaction
 

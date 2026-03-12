@@ -1,14 +1,22 @@
-import { ApprovalDecisionSchema, RunEventSchema } from "../core/schemas";
+import {
+  ApprovalDecisionSchema,
+  RunEventSchema,
+  WorkflowProofRecordSchema
+} from "../core/schemas";
 import {
   ApprovalDecisionResponseSchema,
   PolicySnapshotRequestSchema,
   PolicySnapshotResponseSchema,
+  RecallSearchRequestSchema,
+  RecallSearchResponseSchema,
   RunExecutionRequestSchema,
   RunExecutionResponseSchema,
   RunHistoryRequestSchema,
   RunHistoryResponseSchema,
   TaskIntentRequestSchema,
-  TaskIntentResponseSchema
+  TaskIntentResponseSchema,
+  WorkflowProofSummaryRequestSchema,
+  WorkflowProofSummaryResponseSchema
 } from "../shared/ipc";
 import type { JarvisDesktopApi } from "../shared/desktop-api";
 
@@ -46,6 +54,21 @@ export function createJarvisDesktopApi(ipcRenderer: IpcRendererLike): JarvisDesk
       const parsedPayload = RunHistoryRequestSchema.parse(payload);
       const response = await ipcRenderer.invoke("run.history.list", parsedPayload);
       return RunHistoryResponseSchema.parse(response);
+    },
+    async searchLocalRecall(payload) {
+      const parsedPayload = RecallSearchRequestSchema.parse(payload);
+      const response = await ipcRenderer.invoke("recall.search.query", parsedPayload);
+      return RecallSearchResponseSchema.parse(response);
+    },
+    async recordWorkflowProof(payload) {
+      const parsedPayload = WorkflowProofRecordSchema.parse(payload);
+      const response = await ipcRenderer.invoke("workflow.proof.record", parsedPayload);
+      return WorkflowProofRecordSchema.parse(response);
+    },
+    async getWorkflowProofSummary(payload) {
+      const parsedPayload = WorkflowProofSummaryRequestSchema.parse(payload);
+      const response = await ipcRenderer.invoke("workflow.proof.summary.get", parsedPayload);
+      return WorkflowProofSummaryResponseSchema.parse(response);
     },
     async getPolicySnapshot(payload) {
       const parsedPayload = PolicySnapshotRequestSchema.parse(payload);

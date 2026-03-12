@@ -28,9 +28,10 @@ export interface SimulationBundle {
 function getPrimaryPath(compiledAction: CompiledAction): string {
   return (
     compiledAction.path_scope.entries[0]?.path ??
-    String(
+      String(
       compiledAction.normalized_args.path ??
         compiledAction.normalized_args.repository_path ??
+        compiledAction.normalized_args.working_directory ??
         compiledAction.workspace_scope.roots[0]
     )
   );
@@ -40,11 +41,10 @@ function getPrimarySideEffectFamily(compiledAction: CompiledAction): SideEffectF
   return compiledAction.expected_side_effects[0]?.family ?? "readonly";
 }
 
-function hasNonReadOnlyEffects(effectPreview: EffectPreview): boolean {
+function hasHighImpactLowConfidenceEffects(effectPreview: EffectPreview): boolean {
   return (
     effectPreview.predicted_writes.length > 0 ||
     effectPreview.predicted_deletes.length > 0 ||
-    effectPreview.predicted_process_changes.length > 0 ||
     effectPreview.predicted_remote_calls.length > 0 ||
     effectPreview.predicted_system_changes.length > 0
   );
@@ -150,6 +150,28 @@ export function createEffectPreview(
               "Simulation inferred the write target from compiled args without an exact diff preview."
             ]
       };
+    case "shell_command_guarded": {
+      const commandText = String(compiledAction.normalized_args.command_text ?? "");
+      const workingDirectory = String(
+        compiledAction.normalized_args.working_directory ?? targetPath
+      );
+      const isMutating = sideEffectFamily === "raw_shell_mutating";
+
+      return {
+        action_id: compiledAction.action_id,
+        predicted_reads: isMutating ? [] : [workingDirectory],
+        predicted_writes: isMutating ? [workingDirectory] : [],
+        predicted_deletes: [],
+        predicted_process_changes: [commandText],
+        predicted_remote_calls: [],
+        predicted_system_changes: [],
+        confidence: "low",
+        notes: [
+          "Guarded shell is an audited escape hatch and does not have exact Tier A simulation.",
+          `Command: ${commandText}`
+        ]
+      };
+    }
     default:
       return {
         action_id: compiledAction.action_id,
@@ -179,7 +201,10 @@ export function classifyRisk(
   const writeTarget = effectPreview.predicted_writes[0];
   const isOverwrite = effectPreview.predicted_reads.includes(writeTarget ?? "");
 
-  if (effectPreview.confidence === "low" && hasNonReadOnlyEffects(effectPreview)) {
+  if (
+    effectPreview.confidence === "low" &&
+    hasHighImpactLowConfidenceEffects(effectPreview)
+  ) {
     return {
       risk_level: "DANGER",
       requires_approval: true,

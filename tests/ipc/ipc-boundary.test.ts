@@ -6,13 +6,18 @@ import {
   validApprovalDecisionResponseEnvelope,
   validPolicySnapshotRequestEnvelope,
   validPolicySnapshotResponseEnvelope,
+  validRecallSearchRequestEnvelope,
+  validRecallSearchResponseEnvelope,
   validRunExecutionRequestEnvelope,
   validRunExecutionResponseEnvelope,
   validRunHistoryRequestEnvelope,
   validRunHistoryResponseEnvelope,
   validRunEventEnvelope,
   validTaskIntentEnvelope,
-  validTaskIntentResponseEnvelope
+  validTaskIntentResponseEnvelope,
+  validWorkflowProofRecordEnvelope,
+  validWorkflowProofSummaryRequestEnvelope,
+  validWorkflowProofSummaryResponseEnvelope
 } from "../fixtures";
 
 describe("IPC boundary contracts", () => {
@@ -36,6 +41,21 @@ describe("IPC boundary contracts", () => {
     );
     expect(parseIpcEnvelope(validRunHistoryResponseEnvelope)).toEqual(
       validRunHistoryResponseEnvelope
+    );
+    expect(parseIpcEnvelope(validRecallSearchRequestEnvelope)).toEqual(
+      validRecallSearchRequestEnvelope
+    );
+    expect(parseIpcEnvelope(validRecallSearchResponseEnvelope)).toEqual(
+      validRecallSearchResponseEnvelope
+    );
+    expect(parseIpcEnvelope(validWorkflowProofRecordEnvelope)).toEqual(
+      validWorkflowProofRecordEnvelope
+    );
+    expect(parseIpcEnvelope(validWorkflowProofSummaryRequestEnvelope)).toEqual(
+      validWorkflowProofSummaryRequestEnvelope
+    );
+    expect(parseIpcEnvelope(validWorkflowProofSummaryResponseEnvelope)).toEqual(
+      validWorkflowProofSummaryResponseEnvelope
     );
     expect(parseIpcEnvelope(validPolicySnapshotRequestEnvelope)).toEqual(
       validPolicySnapshotRequestEnvelope

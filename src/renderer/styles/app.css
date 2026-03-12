@@ -19,7 +19,8 @@ body {
 }
 
 button,
-textarea {
+textarea,
+input {
   font: inherit;
 }
 
@@ -236,6 +237,22 @@ button {
   border: 1px solid rgba(122, 153, 186, 0.16);
   border-radius: 18px;
   padding: 16px;
+  color: inherit;
+  background: rgba(5, 12, 22, 0.76);
+}
+
+.inline-search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.inline-search input {
+  flex: 1 1 280px;
+  border: 1px solid rgba(122, 153, 186, 0.16);
+  border-radius: 14px;
+  padding: 12px 14px;
   color: inherit;
   background: rgba(5, 12, 22, 0.76);
 }

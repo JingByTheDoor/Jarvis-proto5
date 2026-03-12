@@ -143,4 +143,52 @@ describe("task preview compiler", () => {
       repo.cleanup();
     }
   });
+
+  it("builds an approval-gated guarded shell preview when no sufficient typed path exists", () => {
+    const repo = createTempRepo({
+      "package.json": JSON.stringify({ name: "phase-5-fixture", version: "1.0.0" }, null, 2)
+    });
+
+    try {
+      const response = createTaskPreview({
+        task: `run command "Get-ChildItem -Name ." in ${repo.root}`,
+        session_id: "session-shell",
+        workspace_roots: [repo.root],
+        requested_at: ISO_NOW
+      });
+
+      expect(response.accepted).toBe(true);
+      expect(response.workflow_state).toBe("awaiting_approval");
+      expect(response.route.chosen_route).toBe("local_guarded_shell");
+      expect(response.route.task_type).toBe("guarded_command");
+      expect(response.simulation_summary?.highest_risk).toBe("CAUTION");
+      expect(response.manifest?.compiled_actions.map((action) => action.tool_name)).toEqual([
+        "shell_command_guarded"
+      ]);
+      expect(response.approval_requests[0]?.side_effect_family).toBe("raw_shell_readonly");
+    } finally {
+      repo.cleanup();
+    }
+  });
+
+  it("keeps typed-tool precedence when a raw shell request maps to git status", () => {
+    const repo = createTempRepo({
+      "package.json": JSON.stringify({ name: "phase-5-fixture", version: "1.0.0" }, null, 2)
+    });
+
+    try {
+      const response = createTaskPreview({
+        task: `run command "git status" in ${repo.root}`,
+        session_id: "session-git-status",
+        workspace_roots: [repo.root],
+        requested_at: ISO_NOW
+      });
+
+      expect(response.accepted).toBe(true);
+      expect(response.route.chosen_route).toBe("local_read_tools");
+      expect(response.manifest?.compiled_actions.some((action) => action.tool_name === "shell_command_guarded")).toBe(false);
+    } finally {
+      repo.cleanup();
+    }
+  });
 });

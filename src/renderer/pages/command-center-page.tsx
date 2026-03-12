@@ -33,6 +33,14 @@ const detailRailSections = [
   "Quick Actions"
 ] as const;
 
+function getShellReceipt(structuredData: unknown): Record<string, unknown> | null {
+  if (!structuredData || typeof structuredData !== "object") {
+    return null;
+  }
+
+  return structuredData as Record<string, unknown>;
+}
+
 export function CommandCenterPage(props: CommandCenterPageProps) {
   const {
     composerValue,
@@ -69,9 +77,10 @@ export function CommandCenterPage(props: CommandCenterPageProps) {
           <h1 id="command-center-title">Shortest safe path from task to review</h1>
         </div>
         <p className="panel-copy">
-          The first golden workflow now stays local and typed through plan, compile, simulation,
-          approval, execution, attestation, and review: inspect a repo, preview an exact change,
-          approve the compiled action, and verify what actually ran.
+          The first golden workflow stays local and typed through plan, compile, simulation,
+          approval, execution, attestation, and review. Phase 6 starts by measuring whether that
+          workflow is actually stable and low-friction before routing, memory, or optional systems
+          broaden.
         </p>
         <label className="composer" htmlFor="task-composer">
           <span>Task composer / input</span>
@@ -188,6 +197,12 @@ export function CommandCenterPage(props: CommandCenterPageProps) {
                 <p>Approval: {action.requires_approval ? "required" : "not required"}</p>
                 <p>Path: {action.path_scope.entries[0]?.path ?? "n/a"}</p>
                 <p>Effect: {action.expected_side_effects[0]?.detail ?? "n/a"}</p>
+                {typeof action.normalized_args.command_text === "string" ? (
+                  <p>Command: {action.normalized_args.command_text}</p>
+                ) : null}
+                {typeof action.normalized_args.working_directory === "string" ? (
+                  <p>Working directory: {action.normalized_args.working_directory}</p>
+                ) : null}
               </article>
             ))
           ) : (
@@ -239,21 +254,32 @@ export function CommandCenterPage(props: CommandCenterPageProps) {
                 <p>{executionResponse.persisted_run_path ?? "No persisted run-log path returned."}</p>
               </article>
               {executionResponse.tool_results.length ? (
-                executionResponse.tool_results.map((toolResult, index) => (
-                  <article className="summary-card" key={`${index}:${String(toolResult.summary)}`}>
-                    <h3>
-                      {typeof toolResult.summary === "string"
-                        ? toolResult.summary
-                        : `Tool ${index + 1}`}
-                    </h3>
-                    <p>OK: {toolResult.ok ? "yes" : "no"}</p>
-                    <p>
-                      {typeof toolResult.error === "string"
-                        ? toolResult.error
-                        : "Structured output is available for review."}
-                    </p>
-                  </article>
-                ))
+                executionResponse.tool_results.map((toolResult, index) => {
+                  const shellReceipt = getShellReceipt(toolResult.structured_data);
+
+                  return (
+                    <article className="summary-card" key={`${index}:${String(toolResult.summary)}`}>
+                      <h3>
+                        {typeof toolResult.summary === "string"
+                          ? toolResult.summary
+                          : `Tool ${index + 1}`}
+                      </h3>
+                      <p>OK: {toolResult.ok ? "yes" : "no"}</p>
+                      <p>
+                        {typeof toolResult.error === "string"
+                          ? toolResult.error
+                          : "Structured output is available for review."}
+                      </p>
+                      {shellReceipt && typeof shellReceipt.command_text === "string" ? (
+                        <>
+                          <p>Command: {shellReceipt.command_text}</p>
+                          <p>CWD: {String(shellReceipt.working_directory ?? "n/a")}</p>
+                          <p>Exit code: {String(shellReceipt.exit_code ?? "n/a")}</p>
+                        </>
+                      ) : null}
+                    </article>
+                  );
+                })
               ) : (
                 <article className="summary-card">
                   <h3>No Tool Output</h3>

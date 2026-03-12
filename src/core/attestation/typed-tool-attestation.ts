@@ -17,6 +17,34 @@ function getUniqueDeviations(
   return [...new Set(deviations)];
 }
 
+function getActualNormalizedArgs(
+  compiledAction: CompiledAction,
+  toolResult: ToolResult
+): Record<string, unknown> {
+  if (
+    compiledAction.tool_name === "shell_command_guarded" &&
+    toolResult.structured_data &&
+    typeof toolResult.structured_data === "object" &&
+    typeof (toolResult.structured_data as Record<string, unknown>).command_text === "string" &&
+    typeof (toolResult.structured_data as Record<string, unknown>).working_directory === "string" &&
+    typeof (toolResult.structured_data as Record<string, unknown>).environment_policy === "string"
+  ) {
+    const receipt = toolResult.structured_data as Record<string, unknown>;
+
+    return {
+      command_text: receipt.command_text,
+      working_directory: receipt.working_directory,
+      environment_policy: receipt.environment_policy,
+      timeout_ms:
+        typeof receipt.timeout_ms === "number"
+          ? receipt.timeout_ms
+          : compiledAction.normalized_args.timeout_ms
+    };
+  }
+
+  return compiledAction.normalized_args;
+}
+
 export function attestTypedToolExecution(input: {
   readonly run_id: string;
   readonly compiled_action: CompiledAction;
@@ -27,7 +55,7 @@ export function attestTypedToolExecution(input: {
   const observedEffects = input.tool_result.observed_effects;
   const actualExecutionHash = createExecutionHash({
     tool_name: input.compiled_action.tool_name,
-    normalized_args: input.compiled_action.normalized_args,
+    normalized_args: getActualNormalizedArgs(input.compiled_action, input.tool_result),
     workspace_scope: input.compiled_action.workspace_scope,
     path_scope: input.compiled_action.path_scope,
     network_scope: input.compiled_action.network_scope,

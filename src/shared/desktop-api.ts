@@ -1,14 +1,22 @@
-import type { ApprovalDecision, RunEvent } from "../core/schemas";
+import type {
+  ApprovalDecision,
+  RunEvent,
+  WorkflowProofRecord
+} from "../core/schemas";
 import type {
   ApprovalDecisionResponse,
   PolicySnapshotRequest,
   PolicySnapshotResponse,
+  RecallSearchRequest,
+  RecallSearchResponse,
   RunExecutionRequest,
   RunExecutionResponse,
   RunHistoryRequest,
   RunHistoryResponse,
   TaskIntentRequest,
-  TaskIntentResponse
+  TaskIntentResponse,
+  WorkflowProofSummaryRequest,
+  WorkflowProofSummaryResponse
 } from "./ipc";
 
 export const jarvisDesktopApiKey = "jarvisDesktop";
@@ -26,6 +34,15 @@ export interface JarvisDesktopApi {
   readonly listRunHistory: (
     payload: RunHistoryRequest
   ) => Promise<RunHistoryResponse>;
+  readonly searchLocalRecall: (
+    payload: RecallSearchRequest
+  ) => Promise<RecallSearchResponse>;
+  readonly recordWorkflowProof: (
+    payload: WorkflowProofRecord
+  ) => Promise<WorkflowProofRecord>;
+  readonly getWorkflowProofSummary: (
+    payload: WorkflowProofSummaryRequest
+  ) => Promise<WorkflowProofSummaryResponse>;
   readonly getPolicySnapshot: (
     payload: PolicySnapshotRequest
   ) => Promise<PolicySnapshotResponse>;

@@ -27,8 +27,15 @@ import type {
   TaskIntentResponse,
   TaskRoute
 } from "../../shared/ipc";
-import { parseSupportedEditInstruction, routeTaskIntent } from "../planning/task-routing";
-import { toolRegistry, type LocalRepoToolName } from "../tools/repo-file-tools";
+import {
+  parseGuardedShellInstruction,
+  parseSupportedEditInstruction,
+  routeTaskIntent
+} from "../planning/task-routing";
+import {
+  classifyShellCommand
+} from "../tools/guarded-shell-tool";
+import { toolRegistry, type SupportedToolName } from "../tools/tool-registry";
 
 function deterministicId(prefix: string, seed: string): string {
   return `${prefix}-${createHash("sha256").update(seed).digest("hex").slice(0, 12)}`;
@@ -42,7 +49,7 @@ function addMinutes(isoTimestamp: string, minutes: number): string {
 
 function createPolicySnapshot(generatedAt: string): PolicySnapshot {
   return {
-    version: "phase-4-execution",
+    version: "phase-6-proof-gate",
     workflow: "PLAN -> COMPILE -> SIMULATE -> APPROVAL -> EXECUTE -> ATTEST -> REVIEW",
     routing_mode: "local_first_stubbed",
     generated_at: generatedAt
@@ -90,7 +97,7 @@ function createAction(input: {
 
 function compileAction(input: {
   readonly action: Action;
-  readonly tool_name: LocalRepoToolName;
+  readonly tool_name: SupportedToolName;
   readonly normalized_args: Record<string, unknown>;
   readonly workspace_root: string;
   readonly path_access: "read" | "write" | "read_write";
@@ -106,7 +113,12 @@ function compileAction(input: {
   const parsedArgs = validateNormalizedToolArgs(input.tool_name, input.normalized_args);
   assertToolSideEffectFamily(input.tool_name, input.effect_family);
   const targetPath =
-    String(parsedArgs.path ?? parsedArgs.repository_path ?? input.workspace_root);
+    String(
+      parsedArgs.path ??
+        parsedArgs.repository_path ??
+        parsedArgs.working_directory ??
+        input.workspace_root
+    );
   const workspace_scope: CompiledAction["workspace_scope"] = {
     roots: [input.workspace_root]
   };
@@ -663,6 +675,127 @@ function buildEditPreview(request: TaskIntentRequest, route: TaskRoute): TaskInt
   };
 }
 
+function buildGuardedShellPreview(
+  request: TaskIntentRequest,
+  route: TaskRoute
+): TaskIntentResponse {
+  const workspaceRoot = request.workspace_roots[0];
+  const expires_at = addMinutes(request.requested_at, 10);
+  const policy_snapshot = createPolicySnapshot(request.requested_at);
+  const canonicalPolicy = new DefaultCanonicalPathPolicy();
+  const shellInstruction = parseGuardedShellInstruction(request.task);
+
+  if (!shellInstruction) {
+    throw new Error(
+      'Phase 5 guarded shell currently supports only `run command "..."` with an optional `in <path>` clause.'
+    );
+  }
+
+  const workingDirectory = canonicalPolicy.authorizePath(
+    normalizeTargetPath(workspaceRoot, shellInstruction.working_directory ?? workspaceRoot),
+    [workspaceRoot]
+  );
+  const shellClassification = classifyShellCommand(shellInstruction.command_text);
+  const isMutating = shellClassification.shell_kind === "mutating";
+  const normalizedShellArgs = {
+    command_text: shellInstruction.command_text,
+    working_directory: workingDirectory.canonicalPath,
+    environment_policy: "inherit_process",
+    timeout_ms: 15000
+  } as const;
+
+  const actions = [
+    createAction({
+      id: deterministicId("action", `${request.task}:guarded-shell`),
+      type: "guarded_shell_command",
+      label: "Execute guarded shell command",
+      description:
+        "Run the explicit local shell escape hatch with an audited receipt and explicit approval scope.",
+      args: normalizedShellArgs,
+      expected_output: "structured shell receipt",
+      risk: isMutating ? "DANGER" : "CAUTION",
+      requires_approval: true,
+      approval_scope_allowed: isMutating
+        ? ["exact_action_only", "never_session_approvable"]
+        : ["exact_action_only"],
+    })
+  ] as const;
+
+  const plan: Plan = {
+    id: deterministicId("plan", `${request.task}:${request.requested_at}`),
+    user_goal: request.task,
+    summary: `Compile the explicit guarded shell command for ${workingDirectory.canonicalPath}, require approval, and keep the receipt reviewable.`,
+    planning_notes: [
+      "Use guarded shell only as an escape hatch.",
+      "Do not bypass a sufficient typed tool path.",
+      "Capture a structured receipt for review and attestation."
+    ],
+    risk_summary: isMutating
+      ? "The guarded shell command is mutating and will remain DANGER plus approve-once only."
+      : "The guarded shell command is read-only but broader than typed tools, so it remains CAUTION and approval-gated.",
+    requires_approval: true,
+    actions: [...actions],
+    created_at: request.requested_at,
+    policy_snapshot
+  };
+
+  const compiled_actions = [
+    compileAction({
+      action: actions[0],
+      tool_name: "shell_command_guarded",
+      normalized_args: normalizedShellArgs,
+      workspace_root: workspaceRoot,
+      path_access: isMutating ? "read_write" : "read",
+      path_reason: "execute explicit guarded shell command",
+      effect_family: isMutating ? "raw_shell_mutating" : "raw_shell_readonly",
+      effect_detail: `guarded shell: ${shellInstruction.command_text}`,
+      risk_level: isMutating ? "DANGER" : "CAUTION",
+      requires_approval: true,
+      session_id: request.session_id,
+      expires_at
+    })
+  ] as const;
+  const simulationBundle = simulateCompiledActions({
+    compiled_actions,
+    session_id: request.session_id,
+    expires_at
+  });
+  const evaluatedRoute = {
+    ...route,
+    risk_class: simulationBundle.simulation_summary.highest_risk
+  } satisfies TaskRoute;
+  const evaluatedPlan = applySimulationRiskSummary(plan, simulationBundle.simulation_summary);
+
+  return {
+    accepted: true,
+    workflow_state: "awaiting_approval",
+    state_trace: [
+      "preparing_plan",
+      "plan_ready",
+      "compiling_manifest",
+      "manifest_ready",
+      "simulating_effects",
+      "simulation_ready",
+      "awaiting_approval"
+    ],
+    message: `Prepared an audited guarded-shell preview for ${workingDirectory.canonicalPath}.`,
+    route: evaluatedRoute,
+    plan: evaluatedPlan,
+    manifest: createManifest({
+      request,
+      plan: evaluatedPlan,
+      compiled_actions: simulationBundle.compiled_actions,
+      policy_snapshot,
+      expires_at
+    }),
+    effect_previews: simulationBundle.effect_previews,
+    approval_requests: simulationBundle.approval_requests,
+    simulation_summary: simulationBundle.simulation_summary,
+    diff_previews: [],
+    preview_generated_at: request.requested_at
+  };
+}
+
 export function createTaskPreview(request: TaskIntentRequest): TaskIntentResponse {
   const route = routeTaskIntent(request.task);
 
@@ -672,6 +805,8 @@ export function createTaskPreview(request: TaskIntentRequest): TaskIntentRespons
         return buildInspectionPreview(request, route);
       case "local_repo_file_tools":
         return buildEditPreview(request, route);
+      case "local_guarded_shell":
+        return buildGuardedShellPreview(request, route);
       case "manual_confirmation_required":
       default:
         return createFailureResponse(

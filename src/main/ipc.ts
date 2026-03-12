@@ -3,25 +3,40 @@ import {
   InMemoryCapabilityTokenStore,
   type CapabilityTokenStore
 } from "../core/capabilities/capability-token-store";
-import { ApprovalDecisionSchema, type RunEvent } from "../core/schemas";
+import {
+  ApprovalDecisionSchema,
+  WorkflowProofRecordSchema,
+  type RunEvent
+} from "../core/schemas";
 import { createTaskPreview } from "../core/compile/task-preview";
 import { ManifestExecutionRuntime } from "../core/execution/manifest-executor";
 import { EncryptedRunLogStore, type RunLogStore } from "../core/events/run-log-store";
+import { searchLocalRecall } from "../core/memory/basic-recall";
+import {
+  EncryptedWorkflowProofStore,
+  type WorkflowProofStore
+} from "../core/proof/workflow-proof-store";
 import {
   ApprovalDecisionResponseSchema,
   PolicySnapshotRequestSchema,
   PolicySnapshotResponseSchema,
+  RecallSearchRequestSchema,
+  RecallSearchResponseSchema,
   RunExecutionRequestSchema,
   RunExecutionResponseSchema,
   RunHistoryRequestSchema,
   RunHistoryResponseSchema,
   TaskIntentRequestSchema,
   TaskIntentResponseSchema,
+  WorkflowProofSummaryRequestSchema,
+  WorkflowProofSummaryResponseSchema,
   type ApprovalDecisionResponse,
   type PolicySnapshotResponse,
+  type RecallSearchResponse,
   type RunExecutionResponse,
   type RunHistoryResponse,
-  type TaskIntentResponse
+  type TaskIntentResponse,
+  type WorkflowProofSummaryResponse
 } from "../shared/ipc";
 import { workflowSequence } from "../shared/constants";
 import { assertTrustedSenderFrame, type IpcSenderEventLike } from "./security";
@@ -36,6 +51,7 @@ export interface ShellIpcOptions {
   readonly approvalRegistry?: ApprovalRegistry;
   readonly capabilityTokenStore?: CapabilityTokenStore;
   readonly runLogStore?: RunLogStore;
+  readonly workflowProofStore?: WorkflowProofStore;
   readonly publishRunEvent?: (event: RunEvent) => void;
 }
 
@@ -67,7 +83,7 @@ export function handlePolicySnapshotRequest(
   PolicySnapshotRequestSchema.parse(payload);
 
   return PolicySnapshotResponseSchema.parse({
-    version: "phase-4-execution",
+    version: "phase-6-proof-gate",
     workflow: workflowSequence,
     local_first: true,
     approval_required_for_risky_actions: true
@@ -120,6 +136,48 @@ export function handleRunHistoryRequest(
   });
 }
 
+export function handleRecallSearchRequest(
+  event: IpcSenderEventLike,
+  payload: unknown,
+  runLogStore: RunLogStore
+): RecallSearchResponse {
+  assertTrustedSenderFrame(event);
+  const request = RecallSearchRequestSchema.parse(payload);
+
+  return RecallSearchResponseSchema.parse(
+    searchLocalRecall({
+      request,
+      runLogStore
+    })
+  );
+}
+
+export function handleWorkflowProofRecord(
+  event: IpcSenderEventLike,
+  payload: unknown,
+  workflowProofStore: WorkflowProofStore
+) {
+  assertTrustedSenderFrame(event);
+  const record = WorkflowProofRecordSchema.parse(payload);
+
+  return WorkflowProofRecordSchema.parse(
+    workflowProofStore.upsertRecord(record.workspace_root, record)
+  );
+}
+
+export function handleWorkflowProofSummaryRequest(
+  event: IpcSenderEventLike,
+  payload: unknown,
+  workflowProofStore: WorkflowProofStore
+): WorkflowProofSummaryResponse {
+  assertTrustedSenderFrame(event);
+  const request = WorkflowProofSummaryRequestSchema.parse(payload);
+
+  return WorkflowProofSummaryResponseSchema.parse(
+    workflowProofStore.getSummary(request.workspace_root, request.limit)
+  );
+}
+
 export function registerShellIpcHandlers(
   ipcMain: IpcMainLike,
   options: ShellIpcOptions
@@ -128,6 +186,8 @@ export function registerShellIpcHandlers(
   const capabilityTokenStore =
     options.capabilityTokenStore ?? new InMemoryCapabilityTokenStore();
   const runLogStore = options.runLogStore ?? new EncryptedRunLogStore();
+  const workflowProofStore =
+    options.workflowProofStore ?? new EncryptedWorkflowProofStore();
   const executionRuntime = new ManifestExecutionRuntime({
     approvalRegistry,
     capabilityTokenStore,
@@ -163,5 +223,25 @@ export function registerShellIpcHandlers(
 
   ipcMain.handle("run.history.list", (event, payload) =>
     handleRunHistoryRequest(event as IpcSenderEventLike, payload, runLogStore)
+  );
+
+  ipcMain.handle("recall.search.query", (event, payload) =>
+    handleRecallSearchRequest(event as IpcSenderEventLike, payload, runLogStore)
+  );
+
+  ipcMain.handle("workflow.proof.record", (event, payload) =>
+    handleWorkflowProofRecord(
+      event as IpcSenderEventLike,
+      payload,
+      workflowProofStore
+    )
+  );
+
+  ipcMain.handle("workflow.proof.summary.get", (event, payload) =>
+    handleWorkflowProofSummaryRequest(
+      event as IpcSenderEventLike,
+      payload,
+      workflowProofStore
+    )
   );
 }

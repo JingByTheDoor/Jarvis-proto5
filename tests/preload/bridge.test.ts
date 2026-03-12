@@ -4,10 +4,13 @@ import { createJarvisDesktopApi } from "../../src/preload/bridge";
 import {
   validApprovalDecision,
   validApprovalDecisionResponse,
+  validRecallSearchResponse,
   validRunExecutionResponse,
   validRunEvent,
   validRunHistoryResponse,
-  validTaskIntentResponseEnvelope
+  validTaskIntentResponseEnvelope,
+  validWorkflowProofRecord,
+  validWorkflowProofSummaryResponse
 } from "../fixtures";
 
 describe("preload bridge", () => {
@@ -108,7 +111,10 @@ describe("preload bridge", () => {
       invoke: vi
         .fn()
         .mockResolvedValueOnce(validRunExecutionResponse)
-        .mockResolvedValueOnce(validRunHistoryResponse),
+        .mockResolvedValueOnce(validRunHistoryResponse)
+        .mockResolvedValueOnce(validRecallSearchResponse)
+        .mockResolvedValueOnce(validWorkflowProofRecord)
+        .mockResolvedValueOnce(validWorkflowProofSummaryResponse),
       send: vi.fn(),
       on: vi.fn(),
       removeListener: vi.fn()
@@ -128,5 +134,24 @@ describe("preload bridge", () => {
         limit: 10
       })
     ).resolves.toEqual(validRunHistoryResponse);
+
+    await expect(
+      desktopApi.searchLocalRecall({
+        workspace_root: "D:\\Jarvis-proto5 repo\\Jarvis-proto5",
+        query: "resume",
+        limit: 10
+      })
+    ).resolves.toEqual(validRecallSearchResponse);
+
+    await expect(
+      desktopApi.recordWorkflowProof(validWorkflowProofRecord)
+    ).resolves.toEqual(validWorkflowProofRecord);
+
+    await expect(
+      desktopApi.getWorkflowProofSummary({
+        workspace_root: "D:\\Jarvis-proto5 repo\\Jarvis-proto5",
+        limit: 5
+      })
+    ).resolves.toEqual(validWorkflowProofSummaryResponse);
   });
 });

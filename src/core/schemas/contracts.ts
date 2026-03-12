@@ -18,9 +18,12 @@ import {
   previewConfidenceLevels,
   provenanceTypes,
   riskLevels,
+  routeKinds,
   sideEffectFamilies,
+  taskTypes,
   verificationStatuses,
   workflowSequence,
+  workflowJourneyKinds,
   workflowStates
 } from "../../shared/constants";
 
@@ -53,6 +56,9 @@ export const ActionStatusSchema = z.enum(actionStatuses);
 export const NetworkSchemeSchema = z.enum(networkSchemes);
 export const NetworkMethodFamilySchema = z.enum(networkMethodFamilies);
 export const NetworkAccessClassSchema = z.enum(networkAccessClasses);
+export const RouteKindSchema = z.enum(routeKinds);
+export const TaskTypeSchema = z.enum(taskTypes);
+export const WorkflowJourneyKindSchema = z.enum(workflowJourneyKinds);
 
 export const NetworkScopeRuleSchema = z
   .object({
@@ -297,6 +303,51 @@ export const MemoryRecordSchema = z
   })
   .strict();
 
+export const WorkflowProofRecordSchema = z
+  .object({
+    journey_id: IdentifierSchema,
+    journey_kind: WorkflowJourneyKindSchema,
+    session_id: z.string().min(1),
+    workspace_root: AbsolutePathSchema,
+    route_kind: RouteKindSchema.nullable(),
+    task_type: TaskTypeSchema.nullable(),
+    risk_class: RiskLevelSchema.nullable(),
+    approval_required: z.boolean(),
+    resume_used: z.boolean(),
+    resumed_from_recall_id: z.string().min(1).nullable(),
+    preview_requested_at: IsoDateTimeSchema,
+    preview_ready_at: IsoDateTimeSchema.nullable(),
+    task_to_preview_ms: z.number().int().min(0).nullable(),
+    approval_recorded_at: IsoDateTimeSchema.nullable(),
+    execute_requested_at: IsoDateTimeSchema.nullable(),
+    first_result_at: IsoDateTimeSchema.nullable(),
+    approval_to_first_result_ms: z.number().int().min(0).nullable(),
+    execute_to_first_result_ms: z.number().int().min(0).nullable(),
+    operator_click_count: z.number().int().min(0),
+    workflow_step_count: z.number().int().min(0),
+    manifest_id: z.string().min(1).nullable(),
+    run_id: z.string().min(1).nullable(),
+    workflow_state: WorkflowStateSchema.nullable(),
+    updated_at: IsoDateTimeSchema
+  })
+  .strict();
+
+export const WorkflowProofSummarySchema = z
+  .object({
+    golden_workflow_attempts: z.number().int().min(0),
+    golden_workflow_review_ready: z.number().int().min(0),
+    golden_workflow_stability_rate: z.number().min(0).max(1),
+    median_task_to_preview_ms: z.number().int().min(0).nullable(),
+    median_approval_to_first_result_ms: z.number().int().min(0).nullable(),
+    median_execute_to_first_result_ms: z.number().int().min(0).nullable(),
+    median_workflow_step_count: z.number().int().min(0).nullable(),
+    median_operator_click_count: z.number().int().min(0).nullable(),
+    resume_journeys: z.number().int().min(0),
+    resume_review_ready: z.number().int().min(0),
+    latest_updated_at: IsoDateTimeSchema.nullable()
+  })
+  .strict();
+
 export type NetworkScopeRule = z.infer<typeof NetworkScopeRuleSchema>;
 export type NetworkScope = z.infer<typeof NetworkScopeSchema>;
 export type WorkspaceScope = z.infer<typeof WorkspaceScopeSchema>;
@@ -316,3 +367,5 @@ export type ExecutionAttestation = z.infer<typeof ExecutionAttestationSchema>;
 export type RunLog = z.infer<typeof RunLogSchema>;
 export type MemoryMetadata = z.infer<typeof MemoryMetadataSchema>;
 export type MemoryRecord = z.infer<typeof MemoryRecordSchema>;
+export type WorkflowProofRecord = z.infer<typeof WorkflowProofRecordSchema>;
+export type WorkflowProofSummary = z.infer<typeof WorkflowProofSummarySchema>;

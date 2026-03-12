@@ -10,14 +10,17 @@ import type {
   PolicySnapshot,
   RunEvent,
   RunLog,
-  ToolResult
+  ToolResult,
+  WorkflowProofRecord
 } from "../src/core/schemas";
 import type {
   ApprovalDecisionResponse,
   ApprovalRequest,
+  RecallSearchResponse,
   RunExecutionResponse,
   RunHistoryResponse,
-  SimulationSummary
+  SimulationSummary,
+  WorkflowProofSummaryResponse
 } from "../src/shared/ipc";
 
 export const ISO_NOW = "2026-03-11T18:00:00.000Z";
@@ -29,7 +32,7 @@ export const README_PATH = `${WORKSPACE_ROOT}\\README.md`;
 export const OUTPUT_PATH = `${WORKSPACE_ROOT}\\.tmp\\runs\\run-1.json`;
 
 export const validPolicySnapshot: PolicySnapshot = {
-  version: "phase-4-execution",
+  version: "phase-6-proof-gate",
   workflow: "PLAN -> COMPILE -> SIMULATE -> APPROVAL -> EXECUTE -> ATTEST -> REVIEW",
   routing_mode: "local_first_stubbed",
   generated_at: ISO_NOW
@@ -278,6 +281,36 @@ export const validRunHistoryResponse: RunHistoryResponse = {
   runs: [validRunLog]
 };
 
+export const validRecallSearchResponse: RecallSearchResponse = {
+  results: [
+    {
+      id: "run:run-1",
+      source_kind: "run_log",
+      title: "run-1",
+      excerpt: "run-1\nplan-1\nmanifest-1\nreview_ready\nSafe read completed",
+      provenance_label: "run_log:run-1 / plan:plan-1 / manifest:manifest-1",
+      trust_label: "tool_confirmed",
+      updated_at: ISO_LATER,
+      location: "run-1",
+      resume_prompt:
+        'Resume the previous task from run-1. Review the prior outcome "Safe read completed" and continue from the same workspace safely.',
+      searchable_text: "run-1\nplan-1\nmanifest-1\nreview_ready\nSafe read completed"
+    },
+    {
+      id: `note:${WORKSPACE_ROOT}\\notes\\operator-note.md`,
+      source_kind: "operator_note",
+      title: "operator-note.md",
+      excerpt: "Remember to keep the write path narrow.",
+      provenance_label: `${WORKSPACE_ROOT}\\notes\\operator-note.md`,
+      trust_label: "user_confirmed",
+      updated_at: ISO_LATER,
+      location: `${WORKSPACE_ROOT}\\notes\\operator-note.md`,
+      resume_prompt: null,
+      searchable_text: "Remember to keep the write path narrow."
+    }
+  ]
+};
+
 export const validMemoryRecord: MemoryRecord = {
   id: "memory-1",
   tier: 1,
@@ -296,6 +329,50 @@ export const validMemoryRecord: MemoryRecord = {
   },
   created_at: ISO_NOW,
   updated_at: ISO_LATER
+};
+
+export const validWorkflowProofRecord: WorkflowProofRecord = {
+  journey_id: "journey-1",
+  journey_kind: "golden_edit_workflow",
+  session_id: "phase-6-proof-gate",
+  workspace_root: WORKSPACE_ROOT,
+  route_kind: "local_repo_file_tools",
+  task_type: "repo_edit",
+  risk_class: "DANGER",
+  approval_required: true,
+  resume_used: true,
+  resumed_from_recall_id: "run:run-1",
+  preview_requested_at: ISO_NOW,
+  preview_ready_at: "2026-03-11T18:00:01.000Z",
+  task_to_preview_ms: 1000,
+  approval_recorded_at: "2026-03-11T18:00:03.000Z",
+  execute_requested_at: "2026-03-11T18:00:04.000Z",
+  first_result_at: "2026-03-11T18:00:05.000Z",
+  approval_to_first_result_ms: 2000,
+  execute_to_first_result_ms: 1000,
+  operator_click_count: 4,
+  workflow_step_count: 4,
+  manifest_id: "manifest-1",
+  run_id: "run-1",
+  workflow_state: "review_ready",
+  updated_at: ISO_LATER
+};
+
+export const validWorkflowProofSummaryResponse: WorkflowProofSummaryResponse = {
+  summary: {
+    golden_workflow_attempts: 1,
+    golden_workflow_review_ready: 1,
+    golden_workflow_stability_rate: 1,
+    median_task_to_preview_ms: 1000,
+    median_approval_to_first_result_ms: 2000,
+    median_execute_to_first_result_ms: 1000,
+    median_workflow_step_count: 4,
+    median_operator_click_count: 4,
+    resume_journeys: 1,
+    resume_review_ready: 1,
+    latest_updated_at: ISO_LATER
+  },
+  recent_journeys: [validWorkflowProofRecord]
 };
 
 export const validTaskIntentEnvelope = {
@@ -386,11 +463,43 @@ export const validPolicySnapshotRequestEnvelope = {
 export const validPolicySnapshotResponseEnvelope = {
   channel: "policy.snapshot.response" as const,
   payload: {
-    version: "phase-4-execution",
+    version: "phase-6-proof-gate",
     workflow: validPolicySnapshot.workflow,
     local_first: true as const,
     approval_required_for_risky_actions: true as const
   }
+};
+
+export const validRecallSearchRequestEnvelope = {
+  channel: "recall.search.query" as const,
+  payload: {
+    workspace_root: WORKSPACE_ROOT,
+    query: "resume",
+    limit: 10
+  }
+};
+
+export const validRecallSearchResponseEnvelope = {
+  channel: "recall.search.response" as const,
+  payload: validRecallSearchResponse
+};
+
+export const validWorkflowProofRecordEnvelope = {
+  channel: "workflow.proof.recorded" as const,
+  payload: validWorkflowProofRecord
+};
+
+export const validWorkflowProofSummaryRequestEnvelope = {
+  channel: "workflow.proof.summary.get" as const,
+  payload: {
+    workspace_root: WORKSPACE_ROOT,
+    limit: 5
+  }
+};
+
+export const validWorkflowProofSummaryResponseEnvelope = {
+  channel: "workflow.proof.summary.response" as const,
+  payload: validWorkflowProofSummaryResponse
 };
 
 export const validRunEventEnvelope = {

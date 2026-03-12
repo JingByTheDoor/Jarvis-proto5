@@ -1,14 +1,22 @@
-import type { ApprovalDecision, RunEvent } from "../core/schemas";
+import type {
+  ApprovalDecision,
+  RunEvent,
+  WorkflowProofRecord
+} from "../core/schemas";
 import type {
   ApprovalDecisionResponse,
   PolicySnapshotRequest,
   PolicySnapshotResponse,
+  RecallSearchRequest,
+  RecallSearchResponse,
   RunExecutionRequest,
   RunExecutionResponse,
   RunHistoryRequest,
   RunHistoryResponse,
   TaskIntentRequest,
-  TaskIntentResponse
+  TaskIntentResponse,
+  WorkflowProofSummaryRequest,
+  WorkflowProofSummaryResponse
 } from "../shared/ipc";
 import { jarvisDesktopApiKey, type JarvisDesktopApi } from "../shared/desktop-api";
 import { workflowSequence } from "../shared/constants";
@@ -79,11 +87,43 @@ export const fallbackJarvisDesktopApi: JarvisDesktopApi = {
       runs: []
     };
   },
+  async searchLocalRecall(
+    _payload: RecallSearchRequest
+  ): Promise<RecallSearchResponse> {
+    return {
+      results: []
+    };
+  },
+  async recordWorkflowProof(
+    payload: WorkflowProofRecord
+  ): Promise<WorkflowProofRecord> {
+    return payload;
+  },
+  async getWorkflowProofSummary(
+    _payload: WorkflowProofSummaryRequest
+  ): Promise<WorkflowProofSummaryResponse> {
+    return {
+      summary: {
+        golden_workflow_attempts: 0,
+        golden_workflow_review_ready: 0,
+        golden_workflow_stability_rate: 0,
+        median_task_to_preview_ms: null,
+        median_approval_to_first_result_ms: null,
+        median_execute_to_first_result_ms: null,
+        median_workflow_step_count: null,
+        median_operator_click_count: null,
+        resume_journeys: 0,
+        resume_review_ready: 0,
+        latest_updated_at: null
+      },
+      recent_journeys: []
+    };
+  },
   async getPolicySnapshot(
     _payload: PolicySnapshotRequest
   ): Promise<PolicySnapshotResponse> {
     return {
-      version: "phase-4-execution",
+      version: "phase-6-proof-gate",
       workflow: workflowSequence,
       local_first: true,
       approval_required_for_risky_actions: true

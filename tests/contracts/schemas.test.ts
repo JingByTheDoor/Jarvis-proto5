@@ -11,7 +11,9 @@ import {
   validPlan,
   validRunEvent,
   validRunLog,
-  validToolResult
+  validToolResult,
+  validWorkflowProofRecord,
+  validWorkflowProofSummaryResponse
 } from "../fixtures";
 
 const examples = {
@@ -35,7 +37,9 @@ const examples = {
   RUN_LOG: validRunLog,
   TOOL_RESULT: validToolResult,
   EXECUTION_ATTESTATION: validExecutionAttestation,
-  MEMORY_RECORD: validMemoryRecord
+  MEMORY_RECORD: validMemoryRecord,
+  WORKFLOW_PROOF_RECORD: validWorkflowProofRecord,
+  WORKFLOW_PROOF_SUMMARY: validWorkflowProofSummaryResponse.summary
 } as const;
 
 const invalidExamples = {
@@ -97,6 +101,14 @@ const invalidExamples = {
       ...validMemoryRecord.metadata,
       verification_status: "verified"
     }
+  },
+  WORKFLOW_PROOF_RECORD: {
+    ...validWorkflowProofRecord,
+    journey_kind: "not-a-real-kind"
+  },
+  WORKFLOW_PROOF_SUMMARY: {
+    ...validWorkflowProofSummaryResponse.summary,
+    golden_workflow_stability_rate: 2
   }
 } as const;
 
@@ -113,7 +125,9 @@ describe("schema registry", () => {
       "RUN_LOG",
       "TOOL_RESULT",
       "EXECUTION_ATTESTATION",
-      "MEMORY_RECORD"
+      "MEMORY_RECORD",
+      "WORKFLOW_PROOF_RECORD",
+      "WORKFLOW_PROOF_SUMMARY"
     ]);
   });
 
@@ -129,4 +143,3 @@ describe("schema registry", () => {
     });
   }
 });
-

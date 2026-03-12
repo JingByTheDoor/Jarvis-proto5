@@ -1,13 +1,52 @@
+import fs from "node:fs";
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { InMemoryApprovalRegistry } from "../../src/core/approval/approval-registry";
+import { EncryptedWorkflowProofStore } from "../../src/core/proof/workflow-proof-store";
+import type { EncryptedAtRestProvider } from "../../src/core/persistence/encrypted-at-rest";
 import {
   handleApprovalDecisionSubmit,
-  handleTaskIntentSubmit
+  handleTaskIntentSubmit,
+  handleWorkflowProofRecord,
+  handleWorkflowProofSummaryRequest
 } from "../../src/main/ipc";
 import { getJarvisAppUrl } from "../../src/main/protocol";
-import { ISO_LATER, ISO_NOW } from "../fixtures";
+import {
+  ISO_LATER,
+  ISO_NOW,
+  validWorkflowProofRecord
+} from "../fixtures";
 import { createTempRepo } from "../support/temp-repo";
+
+class TestEncryptedAtRestProvider implements EncryptedAtRestProvider {
+  writeEncryptedJson<T>(filePath: string, _purpose: any, value: T): any {
+    fs.mkdirSync(path.dirname(filePath), {
+      recursive: true
+    });
+    fs.writeFileSync(filePath, JSON.stringify(value, null, 2), "utf8");
+    return {
+      version: 1,
+      format: "jarvis.encrypted-file",
+      algorithm: "aes-256-gcm",
+      key_id: "test-key",
+      purpose: "cache_entry",
+      iv: "iv",
+      ciphertext: "ciphertext",
+      tag: "tag",
+      created_at: ISO_NOW
+    };
+  }
+
+  readEncryptedJson<T>(filePath: string): T {
+    return JSON.parse(fs.readFileSync(filePath, "utf8")) as T;
+  }
+
+  loadOrCreateContentKey(): any {
+    throw new Error("Not used in test provider.");
+  }
+}
 
 const trustedEvent = {
   senderFrame: {
@@ -112,6 +151,39 @@ describe("main IPC approval flow", () => {
 
       expect(approvalResult.accepted).toBe(false);
       expect(approvalResult.message).toContain("Approval signature changed");
+    } finally {
+      repo.cleanup();
+    }
+  });
+
+  it("records workflow proof samples and returns a local proof summary", () => {
+    const repo = createTempRepo({
+      "package.json": JSON.stringify({ name: "phase-6-proof-ipc", version: "1.0.0" }, null, 2)
+    });
+    const workflowProofStore = new EncryptedWorkflowProofStore(new TestEncryptedAtRestProvider());
+
+    try {
+      const recorded = handleWorkflowProofRecord(
+        trustedEvent,
+        {
+          ...validWorkflowProofRecord,
+          workspace_root: repo.root
+        },
+        workflowProofStore
+      );
+      const summary = handleWorkflowProofSummaryRequest(
+        trustedEvent,
+        {
+          workspace_root: repo.root,
+          limit: 5
+        },
+        workflowProofStore
+      );
+
+      expect(recorded.workspace_root).toBe(repo.root);
+      expect(summary.summary.golden_workflow_attempts).toBe(1);
+      expect(summary.summary.golden_workflow_review_ready).toBe(1);
+      expect(summary.recent_journeys[0]?.journey_id).toBe(recorded.journey_id);
     } finally {
       repo.cleanup();
     }

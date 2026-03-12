@@ -36,7 +36,7 @@ export function createTempRepo(initialFiles: Record<string, string>): TempRepo {
   }
 
   runGit(["add", "."]);
-  runGit(["commit", "-m", "Initial fixture"]);
+  runGit(["commit", "--allow-empty", "-m", "Initial fixture"]);
 
   return {
     root,

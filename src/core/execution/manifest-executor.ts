@@ -8,7 +8,7 @@ import type {
   ToolResult
 } from "../schemas";
 import type { RunLogStore } from "../events/run-log-store";
-import { getToolDefinition } from "../tools/repo-file-tools";
+import { getToolDefinition } from "../tools/tool-registry";
 import type { RunExecutionResponse } from "../../shared/ipc";
 
 export interface ManifestExecutionRuntimeOptions {

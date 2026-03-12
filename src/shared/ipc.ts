@@ -15,6 +15,9 @@ import {
   RunLogSchema,
   SideEffectFamilySchema,
   ToolResultSchema,
+  VerificationStatusSchema,
+  WorkflowProofRecordSchema,
+  WorkflowProofSummarySchema,
   WorkflowStateSchema
 } from "../core/schemas";
 import {
@@ -172,6 +175,49 @@ export const RunHistoryResponseSchema = z
   })
   .strict();
 
+export const RecallEntrySchema = z
+  .object({
+    id: z.string().min(1),
+    source_kind: z.enum(["run_log", "operator_note"]),
+    title: z.string().min(1),
+    excerpt: z.string(),
+    provenance_label: z.string().min(1),
+    trust_label: VerificationStatusSchema,
+    updated_at: z.string().datetime({ offset: true }),
+    location: z.string().min(1).nullable(),
+    resume_prompt: z.string().min(1).nullable(),
+    searchable_text: z.string()
+  })
+  .strict();
+
+export const RecallSearchRequestSchema = z
+  .object({
+    workspace_root: z.string().min(1),
+    query: z.string(),
+    limit: z.number().int().min(1).max(25)
+  })
+  .strict();
+
+export const RecallSearchResponseSchema = z
+  .object({
+    results: z.array(RecallEntrySchema)
+  })
+  .strict();
+
+export const WorkflowProofSummaryRequestSchema = z
+  .object({
+    workspace_root: z.string().min(1),
+    limit: z.number().int().min(1).max(25)
+  })
+  .strict();
+
+export const WorkflowProofSummaryResponseSchema = z
+  .object({
+    summary: WorkflowProofSummarySchema,
+    recent_journeys: z.array(WorkflowProofRecordSchema)
+  })
+  .strict();
+
 export const RunEventEnvelopeSchema = z
   .object({
     channel: z.literal("run.event.push"),
@@ -211,6 +257,30 @@ export const ipcContractMap = {
   "run.history.response": {
     direction: "main_to_renderer",
     payloadSchema: RunHistoryResponseSchema
+  },
+  "recall.search.query": {
+    direction: "renderer_to_main",
+    payloadSchema: RecallSearchRequestSchema
+  },
+  "recall.search.response": {
+    direction: "main_to_renderer",
+    payloadSchema: RecallSearchResponseSchema
+  },
+  "workflow.proof.record": {
+    direction: "renderer_to_main",
+    payloadSchema: WorkflowProofRecordSchema
+  },
+  "workflow.proof.recorded": {
+    direction: "main_to_renderer",
+    payloadSchema: WorkflowProofRecordSchema
+  },
+  "workflow.proof.summary.get": {
+    direction: "renderer_to_main",
+    payloadSchema: WorkflowProofSummaryRequestSchema
+  },
+  "workflow.proof.summary.response": {
+    direction: "main_to_renderer",
+    payloadSchema: WorkflowProofSummaryResponseSchema
   },
   "policy.snapshot.get": {
     direction: "renderer_to_main",
@@ -262,6 +332,30 @@ export const IpcEnvelopeSchema = z.discriminatedUnion("channel", [
     payload: RunHistoryResponseSchema
   }),
   z.object({
+    channel: z.literal("recall.search.query"),
+    payload: RecallSearchRequestSchema
+  }),
+  z.object({
+    channel: z.literal("recall.search.response"),
+    payload: RecallSearchResponseSchema
+  }),
+  z.object({
+    channel: z.literal("workflow.proof.record"),
+    payload: WorkflowProofRecordSchema
+  }),
+  z.object({
+    channel: z.literal("workflow.proof.recorded"),
+    payload: WorkflowProofRecordSchema
+  }),
+  z.object({
+    channel: z.literal("workflow.proof.summary.get"),
+    payload: WorkflowProofSummaryRequestSchema
+  }),
+  z.object({
+    channel: z.literal("workflow.proof.summary.response"),
+    payload: WorkflowProofSummaryResponseSchema
+  }),
+  z.object({
     channel: z.literal("policy.snapshot.get"),
     payload: PolicySnapshotRequestSchema
   }),
@@ -282,6 +376,11 @@ export type RunExecutionRequest = z.infer<typeof RunExecutionRequestSchema>;
 export type RunExecutionResponse = z.infer<typeof RunExecutionResponseSchema>;
 export type RunHistoryRequest = z.infer<typeof RunHistoryRequestSchema>;
 export type RunHistoryResponse = z.infer<typeof RunHistoryResponseSchema>;
+export type RecallEntry = z.infer<typeof RecallEntrySchema>;
+export type RecallSearchRequest = z.infer<typeof RecallSearchRequestSchema>;
+export type RecallSearchResponse = z.infer<typeof RecallSearchResponseSchema>;
+export type WorkflowProofSummaryRequest = z.infer<typeof WorkflowProofSummaryRequestSchema>;
+export type WorkflowProofSummaryResponse = z.infer<typeof WorkflowProofSummaryResponseSchema>;
 export type TaskRoute = z.infer<typeof TaskRouteSchema>;
 export type DiffPreview = z.infer<typeof DiffPreviewSchema>;
 export type ApprovalRequest = z.infer<typeof ApprovalRequestSchema>;

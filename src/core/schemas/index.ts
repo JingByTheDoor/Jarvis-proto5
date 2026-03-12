@@ -9,7 +9,9 @@ import {
   PlanSchema,
   RunEventSchema,
   RunLogSchema,
-  ToolResultSchema
+  ToolResultSchema,
+  WorkflowProofRecordSchema,
+  WorkflowProofSummarySchema
 } from "./contracts";
 
 export const schemaRegistry = {
@@ -23,7 +25,9 @@ export const schemaRegistry = {
   RUN_LOG: RunLogSchema,
   TOOL_RESULT: ToolResultSchema,
   EXECUTION_ATTESTATION: ExecutionAttestationSchema,
-  MEMORY_RECORD: MemoryRecordSchema
+  MEMORY_RECORD: MemoryRecordSchema,
+  WORKFLOW_PROOF_RECORD: WorkflowProofRecordSchema,
+  WORKFLOW_PROOF_SUMMARY: WorkflowProofSummarySchema
 } as const;
 
 export type SchemaRegistry = typeof schemaRegistry;
