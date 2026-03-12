@@ -180,6 +180,9 @@ Rules:
 - `deny` blocks execution.
 - `approve_once` authorizes exactly one compiled action with one exact `approval_signature` and one exact `execution_hash`.
 - `approve_session` authorizes repeated execution only when both hashes remain identical.
+- Approval decisions are recorded against the compiled `manifest_id` plus exact `action_id`; prose plans never carry approval authority.
+- Approval submission must include both `approval_signature` and `execution_hash`, and mismatches are rejected as silent widening attempts.
+- Approval submission returns a typed receipt so rejected or recorded decisions remain visible to the renderer and operator.
 - Session approval never widens tool, args, scopes, side-effect family, max execution count, session id, or expiry time.
 - Destructive actions and mutating raw shell are never session-approvable.
 - No hidden approvals, silent escalation, or risky fallback behavior is permitted.
@@ -322,8 +325,22 @@ Capability tokens are opaque privileged-memory records bound to:
 Rules:
 
 - Tokens are single-use by default.
+- Tokens are consumed before any non-trivial side effect occurs.
 - Tokens are revoked on expiry, session end, manual lock, crash recovery, and restart.
 - Tokens are never persisted to renderer state, logs, memory, analytics, or crash reports.
+
+## Execution Runtime and Review
+
+Execution runtime rules:
+
+- The privileged runtime executes only registered compiled actions from a compiled manifest.
+- Non-trivial actions require both a valid approval record and a freshly issued capability token bound to the same run, action, approval signature, execution hash, and session.
+- Live execution visibility uses structured `RUN_EVENT` records only; renderer surfaces never receive raw shell or runtime handles.
+- Persisted run logs live under `.tmp/runs/<run_id>.json`, remain encrypted at rest, and include events, final result, attestations, artifacts, and persistence status.
+- Typed-tool attestation compares the approved execution hash against the observed execution hash and records any deviation classes explicitly.
+- `review_ready` requires successful execution, required attestation, and persisted review state.
+- If execution succeeds but run-log persistence fails, the result and attestation remain visible, `persisted_run_path` stays null, and the workflow falls back to `execution_complete` instead of falsely claiming `review_ready`.
+- Results, persisted paths, and artifacts must stay visible in the Command Center and Tasks & Projects review surfaces.
 
 ## Retention and Sensitive Session
 

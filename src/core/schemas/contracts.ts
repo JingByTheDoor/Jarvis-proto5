@@ -192,10 +192,12 @@ export const EffectPreviewSchema = z
 
 export const ApprovalDecisionSchema = z
   .object({
+    manifest_id: IdentifierSchema,
     action_id: IdentifierSchema,
     decision: ApprovalDecisionKindSchema,
     approval_scope_class: ApprovalScopeClassSchema,
     approval_signature: z.string().min(1),
+    execution_hash: z.string().min(1),
     max_execution_count: z.number().int().min(1),
     session_id: z.string().min(1),
     expires_at: IsoDateTimeSchema,
@@ -314,4 +316,3 @@ export type ExecutionAttestation = z.infer<typeof ExecutionAttestationSchema>;
 export type RunLog = z.infer<typeof RunLogSchema>;
 export type MemoryMetadata = z.infer<typeof MemoryMetadataSchema>;
 export type MemoryRecord = z.infer<typeof MemoryRecordSchema>;
-

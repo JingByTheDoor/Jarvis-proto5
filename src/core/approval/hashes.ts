@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import type {
   CompiledAction,
+  PolicySnapshot,
   NetworkScope,
   PathScope,
   WorkspaceScope
@@ -27,6 +28,14 @@ export interface ExecutionHashInput {
   readonly path_scope: PathScope;
   readonly network_scope: NetworkScope;
   readonly expected_side_effects: CompiledAction["expected_side_effects"];
+}
+
+export interface ManifestHashInput {
+  readonly plan_id: string;
+  readonly run_id: string;
+  readonly compiled_actions: readonly CompiledAction[];
+  readonly policy_snapshot: PolicySnapshot;
+  readonly expires_at: string;
 }
 
 function stableStringify(value: unknown): string {
@@ -59,3 +68,6 @@ export function createExecutionHash(input: ExecutionHashInput): string {
   return sha256(input);
 }
 
+export function createManifestHash(input: ManifestHashInput): string {
+  return sha256(input);
+}

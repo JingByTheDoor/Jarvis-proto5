@@ -229,3 +229,12 @@ export type CapabilityRevocationReason =
 export const workflowSequence =
   "PLAN -> COMPILE -> SIMULATE -> APPROVAL -> EXECUTE -> ATTEST -> REVIEW";
 
+export const taskTypes = ["repo_inspection", "repo_edit", "unsupported"] as const;
+export type TaskType = (typeof taskTypes)[number];
+
+export const routeKinds = [
+  "local_read_tools",
+  "local_repo_file_tools",
+  "manual_confirmation_required"
+] as const;
+export type RouteKind = (typeof routeKinds)[number];

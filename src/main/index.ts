@@ -48,7 +48,14 @@ async function bootstrap(): Promise<void> {
   registerJarvisProtocol(protocol, net, rendererDirectory);
   applyDefaultSessionGuards(session.defaultSession);
   registerShellIpcHandlers(ipcMain, {
-    now: () => new Date().toISOString()
+    now: () => new Date().toISOString(),
+    publishRunEvent: (event) => {
+      for (const browserWindow of BrowserWindow.getAllWindows()) {
+        if (!browserWindow.isDestroyed()) {
+          browserWindow.webContents.send("run.event.push", event);
+        }
+      }
+    }
   });
 
   createMainWindow();

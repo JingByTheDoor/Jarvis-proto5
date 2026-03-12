@@ -1,7 +1,12 @@
 import { ApprovalDecisionSchema, RunEventSchema } from "../core/schemas";
 import {
+  ApprovalDecisionResponseSchema,
   PolicySnapshotRequestSchema,
   PolicySnapshotResponseSchema,
+  RunExecutionRequestSchema,
+  RunExecutionResponseSchema,
+  RunHistoryRequestSchema,
+  RunHistoryResponseSchema,
   TaskIntentRequestSchema,
   TaskIntentResponseSchema
 } from "../shared/ipc";
@@ -27,9 +32,20 @@ export function createJarvisDesktopApi(ipcRenderer: IpcRendererLike): JarvisDesk
       const response = await ipcRenderer.invoke("task.intent.submit", parsedPayload);
       return TaskIntentResponseSchema.parse(response);
     },
-    submitApprovalDecision(payload) {
+    async submitApprovalDecision(payload) {
       const parsedPayload = ApprovalDecisionSchema.parse(payload);
-      ipcRenderer.send("approval.decision.submit", parsedPayload);
+      const response = await ipcRenderer.invoke("approval.decision.submit", parsedPayload);
+      return ApprovalDecisionResponseSchema.parse(response);
+    },
+    async executeManifest(payload) {
+      const parsedPayload = RunExecutionRequestSchema.parse(payload);
+      const response = await ipcRenderer.invoke("run.execution.submit", parsedPayload);
+      return RunExecutionResponseSchema.parse(response);
+    },
+    async listRunHistory(payload) {
+      const parsedPayload = RunHistoryRequestSchema.parse(payload);
+      const response = await ipcRenderer.invoke("run.history.list", parsedPayload);
+      return RunHistoryResponseSchema.parse(response);
     },
     async getPolicySnapshot(payload) {
       const parsedPayload = PolicySnapshotRequestSchema.parse(payload);

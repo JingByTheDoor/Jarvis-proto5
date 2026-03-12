@@ -3,7 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 import { createJarvisDesktopApi } from "../../src/preload/bridge";
 import {
   validApprovalDecision,
+  validApprovalDecisionResponse,
+  validRunExecutionResponse,
   validRunEvent,
+  validRunHistoryResponse,
   validTaskIntentResponseEnvelope
 } from "../fixtures";
 
@@ -59,13 +62,13 @@ describe("preload bridge", () => {
     ).rejects.toThrow();
   });
 
-  it("sends typed approval payloads and only forwards schema-valid run events", () => {
+  it("sends typed approval payloads and only forwards schema-valid run events", async () => {
     let runEventListener:
       | ((event: unknown, payload: unknown) => void)
       | undefined;
     const receivedEvents: string[] = [];
     const ipcRenderer = {
-      invoke: vi.fn(),
+      invoke: vi.fn().mockResolvedValue(validApprovalDecisionResponse),
       send: vi.fn(),
       on: vi.fn((channel, listener) => {
         if (channel === "run.event.push") {
@@ -76,8 +79,10 @@ describe("preload bridge", () => {
     };
     const desktopApi = createJarvisDesktopApi(ipcRenderer);
 
-    desktopApi.submitApprovalDecision(validApprovalDecision);
-    expect(ipcRenderer.send).toHaveBeenCalledWith(
+    await expect(desktopApi.submitApprovalDecision(validApprovalDecision)).resolves.toEqual(
+      validApprovalDecisionResponse
+    );
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith(
       "approval.decision.submit",
       validApprovalDecision
     );
@@ -96,5 +101,32 @@ describe("preload bridge", () => {
       "run.event.push",
       expect.any(Function)
     );
+  });
+
+  it("validates execution and run-history responses from the main process", async () => {
+    const ipcRenderer = {
+      invoke: vi
+        .fn()
+        .mockResolvedValueOnce(validRunExecutionResponse)
+        .mockResolvedValueOnce(validRunHistoryResponse),
+      send: vi.fn(),
+      on: vi.fn(),
+      removeListener: vi.fn()
+    };
+    const desktopApi = createJarvisDesktopApi(ipcRenderer);
+
+    await expect(
+      desktopApi.executeManifest({
+        manifest_id: "manifest-1",
+        session_id: "session-1"
+      })
+    ).resolves.toEqual(validRunExecutionResponse);
+
+    await expect(
+      desktopApi.listRunHistory({
+        workspace_root: "D:\\Jarvis-proto5 repo\\Jarvis-proto5",
+        limit: 10
+      })
+    ).resolves.toEqual(validRunHistoryResponse);
   });
 });

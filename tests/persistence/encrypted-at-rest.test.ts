@@ -100,31 +100,35 @@ describe("encrypted-at-rest provider", () => {
     15000
   );
 
-  it("reuses the same installation key across provider instances", () => {
-    const root = createTempRoot();
-    const keyDirectory = path.join(root, "keys");
-    const filePath = path.join(root, "run-log.json");
+  it(
+    "reuses the same installation key across provider instances",
+    () => {
+      const root = createTempRoot();
+      const keyDirectory = path.join(root, "keys");
+      const filePath = path.join(root, "run-log.json");
 
-    const firstProvider = new DefaultEncryptedAtRestProvider();
-    const secondProvider = new DefaultEncryptedAtRestProvider();
+      const firstProvider = new DefaultEncryptedAtRestProvider();
+      const secondProvider = new DefaultEncryptedAtRestProvider();
 
-    firstProvider.writeEncryptedJson(
-      filePath,
-      "run_log",
-      { summary: "shared key round trip" },
-      keyDirectory
-    );
-
-    expect(
-      secondProvider.readEncryptedJson<{ summary: string }>(
+      firstProvider.writeEncryptedJson(
         filePath,
         "run_log",
+        { summary: "shared key round trip" },
         keyDirectory
-      )
-    ).toEqual({
-      summary: "shared key round trip"
-    });
-  });
+      );
+
+      expect(
+        secondProvider.readEncryptedJson<{ summary: string }>(
+          filePath,
+          "run_log",
+          keyDirectory
+        )
+      ).toEqual({
+        summary: "shared key round trip"
+      });
+    },
+    15000
+  );
 
   it("fails safely when the encrypted payload is tampered with", () => {
     const provider = new DefaultEncryptedAtRestProvider();

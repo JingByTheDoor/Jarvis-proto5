@@ -1,0 +1,146 @@
+import path from "node:path";
+
+import { describe, expect, it } from "vitest";
+
+import { createTaskPreview } from "../../src/core/compile/task-preview";
+import { localRepoToolNames } from "../../src/core/tools/repo-file-tools";
+import { ISO_NOW } from "../fixtures";
+import { createTempRepo } from "../support/temp-repo";
+
+const typedToolNames = new Set<string>(localRepoToolNames);
+
+describe("task preview compiler", () => {
+  it("builds a real read-only inspection manifest from typed tools", () => {
+    const repo = createTempRepo({
+      "package.json": JSON.stringify({ name: "phase-2-fixture", version: "1.0.0" }, null, 2)
+    });
+
+    try {
+      const response = createTaskPreview({
+        task: "Inspect the repo and summarize the current status",
+        session_id: "session-inspect",
+        workspace_roots: [repo.root],
+        requested_at: ISO_NOW
+      });
+
+      expect(response.accepted).toBe(true);
+      expect(response.workflow_state).toBe("simulation_ready");
+      expect(response.route.chosen_route).toBe("local_read_tools");
+      expect(response.route.risk_class).toBe("SAFE");
+      expect(response.plan?.actions).toHaveLength(4);
+      expect(response.manifest?.compiled_actions).toHaveLength(4);
+      expect(response.effect_previews).toHaveLength(4);
+      expect(response.simulation_summary?.highest_risk).toBe("SAFE");
+      expect(response.approval_requests).toEqual([]);
+      expect(response.manifest?.compiled_actions.map((action) => action.tool_name)).toEqual([
+        "list_directory",
+        "git_status",
+        "git_diff",
+        "read_text_file"
+      ]);
+      expect(
+        response.manifest?.compiled_actions.every((action) => typedToolNames.has(action.tool_name))
+      ).toBe(true);
+      expect(response.diff_previews).toEqual([]);
+    } finally {
+      repo.cleanup();
+    }
+  });
+
+  it("builds an exact diff preview and approval-gated write action for supported edits", () => {
+    const repo = createTempRepo({
+      "package.json": JSON.stringify({ name: "phase-2-fixture", version: "1.0.0" }, null, 2),
+      "docs/notes.txt": "hello world\n"
+    });
+
+    try {
+      const response = createTaskPreview({
+        task: 'replace "world" with "JARVIS" in docs/notes.txt',
+        session_id: "session-edit",
+        workspace_roots: [repo.root],
+        requested_at: ISO_NOW
+      });
+
+      expect(response.accepted).toBe(true);
+      expect(response.workflow_state).toBe("awaiting_approval");
+      expect(response.route.chosen_route).toBe("local_repo_file_tools");
+      expect(response.route.task_level).toBe(3);
+      expect(response.route.risk_class).toBe("DANGER");
+      expect(response.plan?.requires_approval).toBe(true);
+      expect(response.simulation_summary?.highest_risk).toBe("DANGER");
+      expect(response.approval_requests).toHaveLength(1);
+      expect(response.approval_requests[0]?.decision_options).toEqual([
+        "deny",
+        "approve_once"
+      ]);
+      expect(response.manifest?.compiled_actions.map((action) => action.tool_name)).toEqual([
+        "git_status",
+        "read_text_file",
+        "diff_file",
+        "write_text_file"
+      ]);
+
+      const writeAction = response.manifest?.compiled_actions.at(-1);
+      expect(writeAction?.requires_approval).toBe(true);
+      expect(writeAction?.risk_level).toBe("DANGER");
+      expect(writeAction?.path_scope.entries[0]?.path).toBe(
+        path.join(repo.root, "docs", "notes.txt")
+      );
+
+      expect(response.diff_previews).toHaveLength(1);
+      expect(response.diff_previews[0]?.unified_diff).toContain("-hello world");
+      expect(response.diff_previews[0]?.unified_diff).toContain("+hello JARVIS");
+    } finally {
+      repo.cleanup();
+    }
+  });
+
+  it("stops unsupported requests at manual confirmation", () => {
+    const repo = createTempRepo({
+      "package.json": JSON.stringify({ name: "phase-2-fixture", version: "1.0.0" }, null, 2)
+    });
+
+    try {
+      const response = createTaskPreview({
+        task: "Launch a browser and deploy this repo",
+        session_id: "session-unsupported",
+        workspace_roots: [repo.root],
+        requested_at: ISO_NOW
+      });
+
+      expect(response.accepted).toBe(false);
+      expect(response.workflow_state).toBe("idle");
+      expect(response.route.chosen_route).toBe("manual_confirmation_required");
+      expect(response.plan).toBeNull();
+      expect(response.manifest).toBeNull();
+      expect(response.effect_previews).toEqual([]);
+      expect(response.approval_requests).toEqual([]);
+    } finally {
+      repo.cleanup();
+    }
+  });
+
+  it("fails the preview if a replace target does not exist in the file", () => {
+    const repo = createTempRepo({
+      "package.json": JSON.stringify({ name: "phase-2-fixture", version: "1.0.0" }, null, 2),
+      "docs/notes.txt": "hello world\n"
+    });
+
+    try {
+      const response = createTaskPreview({
+        task: 'replace "missing" with "JARVIS" in docs/notes.txt',
+        session_id: "session-missing",
+        workspace_roots: [repo.root],
+        requested_at: ISO_NOW
+      });
+
+      expect(response.accepted).toBe(false);
+      expect(response.workflow_state).toBe("failed");
+      expect(response.message).toContain('Could not find "missing"');
+      expect(response.manifest).toBeNull();
+      expect(response.simulation_summary).toBeNull();
+    } finally {
+      repo.cleanup();
+    }
+  });
+});

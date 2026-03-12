@@ -1,7 +1,48 @@
 import { z } from "zod";
 
-import { ApprovalDecisionSchema, RunEventSchema, WorkflowStateSchema } from "../core/schemas";
-import { workflowSequence } from "./constants";
+import {
+  ApprovalDecisionSchema,
+  ApprovalDecisionKindSchema,
+  ApprovalScopeClassSchema,
+  EffectPreviewSchema,
+  ExecutionAttestationSchema,
+  ExecutionManifestSchema,
+  NetworkScopeSchema,
+  PathScopeSchema,
+  PlanSchema,
+  RiskLevelSchema,
+  RunEventSchema,
+  RunLogSchema,
+  SideEffectFamilySchema,
+  ToolResultSchema,
+  WorkflowStateSchema
+} from "../core/schemas";
+import {
+  routeKinds,
+  riskLevels,
+  taskTypes,
+  workflowSequence
+} from "./constants";
+
+export const TaskRouteSchema = z
+  .object({
+    task_level: z.number().int().min(1).max(5),
+    task_type: z.enum(taskTypes),
+    risk_class: z.enum(riskLevels),
+    chosen_route: z.enum(routeKinds),
+    operator_explanation: z.string().min(1)
+  })
+  .strict();
+
+export const DiffPreviewSchema = z
+  .object({
+    path: z.string().min(1),
+    status: z.enum(["created", "modified", "unchanged"]),
+    before: z.string(),
+    after: z.string(),
+    unified_diff: z.string()
+  })
+  .strict();
 
 export const TaskIntentRequestSchema = z
   .object({
@@ -12,11 +53,74 @@ export const TaskIntentRequestSchema = z
   })
   .strict();
 
+export const ApprovalRequestSchema = z
+  .object({
+    action_id: z.string().min(1),
+    risk_level: RiskLevelSchema,
+    decision_options: z.array(ApprovalDecisionKindSchema).min(1),
+    allowed_scope_classes: z.array(ApprovalScopeClassSchema).min(1),
+    approval_signature: z.string().min(1),
+    execution_hash: z.string().min(1),
+    max_execution_count: z.number().int().min(1),
+    session_id: z.string().min(1),
+    expires_at: z.string().datetime({ offset: true }),
+    path_scope: PathScopeSchema,
+    network_scope: NetworkScopeSchema,
+    side_effect_family: SideEffectFamilySchema,
+    justification: z.string().min(1)
+  })
+  .strict();
+
+export const SimulationSummarySchema = z
+  .object({
+    highest_risk: RiskLevelSchema,
+    approval_required: z.boolean(),
+    preview_count: z.number().int().min(0),
+    confidence_breakdown: z
+      .object({
+        high: z.number().int().min(0),
+        medium: z.number().int().min(0),
+        low: z.number().int().min(0)
+      })
+      .strict(),
+    notes: z.array(z.string())
+  })
+  .strict();
+
+export const ApprovalDecisionResponseSchema = z
+  .object({
+    accepted: z.boolean(),
+    manifest_id: z.string().min(1),
+    action_id: z.string().min(1),
+    decision: ApprovalDecisionKindSchema,
+    approval_scope_class: ApprovalScopeClassSchema,
+    approval_signature: z.string().min(1),
+    execution_hash: z.string().min(1),
+    max_execution_count: z.number().int().min(0),
+    session_id: z.string().min(1),
+    expires_at: z.string().datetime({ offset: true }),
+    decided_at: z.string().datetime({ offset: true }),
+    decided_by: z.string().min(1),
+    remaining_uses: z.number().int().min(0),
+    reusable_within_session: z.boolean(),
+    message: z.string().min(1)
+  })
+  .strict();
+
 export const TaskIntentResponseSchema = z
   .object({
     accepted: z.boolean(),
     workflow_state: WorkflowStateSchema,
-    message: z.string().min(1)
+    state_trace: z.array(WorkflowStateSchema).min(1),
+    message: z.string().min(1),
+    route: TaskRouteSchema,
+    plan: PlanSchema.nullable(),
+    manifest: ExecutionManifestSchema.nullable(),
+    effect_previews: z.array(EffectPreviewSchema),
+    approval_requests: z.array(ApprovalRequestSchema),
+    simulation_summary: SimulationSummarySchema.nullable(),
+    diff_previews: z.array(DiffPreviewSchema),
+    preview_generated_at: z.string().datetime({ offset: true })
   })
   .strict();
 
@@ -32,6 +136,39 @@ export const PolicySnapshotResponseSchema = z
     workflow: z.literal(workflowSequence),
     local_first: z.literal(true),
     approval_required_for_risky_actions: z.literal(true)
+  })
+  .strict();
+
+export const RunExecutionRequestSchema = z
+  .object({
+    manifest_id: z.string().min(1),
+    session_id: z.string().min(1)
+  })
+  .strict();
+
+export const RunExecutionResponseSchema = z
+  .object({
+    accepted: z.boolean(),
+    workflow_state: WorkflowStateSchema,
+    message: z.string().min(1),
+    run_id: z.string().min(1).nullable(),
+    persisted_run_path: z.string().min(1).nullable(),
+    run_log: RunLogSchema.nullable(),
+    tool_results: z.array(ToolResultSchema),
+    attestations: z.array(ExecutionAttestationSchema)
+  })
+  .strict();
+
+export const RunHistoryRequestSchema = z
+  .object({
+    workspace_root: z.string().min(1),
+    limit: z.number().int().min(1).max(50)
+  })
+  .strict();
+
+export const RunHistoryResponseSchema = z
+  .object({
+    runs: z.array(RunLogSchema)
   })
   .strict();
 
@@ -54,6 +191,26 @@ export const ipcContractMap = {
   "approval.decision.submit": {
     direction: "renderer_to_main",
     payloadSchema: ApprovalDecisionSchema
+  },
+  "approval.decision.response": {
+    direction: "main_to_renderer",
+    payloadSchema: ApprovalDecisionResponseSchema
+  },
+  "run.execution.submit": {
+    direction: "renderer_to_main",
+    payloadSchema: RunExecutionRequestSchema
+  },
+  "run.execution.response": {
+    direction: "main_to_renderer",
+    payloadSchema: RunExecutionResponseSchema
+  },
+  "run.history.list": {
+    direction: "renderer_to_main",
+    payloadSchema: RunHistoryRequestSchema
+  },
+  "run.history.response": {
+    direction: "main_to_renderer",
+    payloadSchema: RunHistoryResponseSchema
   },
   "policy.snapshot.get": {
     direction: "renderer_to_main",
@@ -85,6 +242,26 @@ export const IpcEnvelopeSchema = z.discriminatedUnion("channel", [
     payload: ApprovalDecisionSchema
   }),
   z.object({
+    channel: z.literal("approval.decision.response"),
+    payload: ApprovalDecisionResponseSchema
+  }),
+  z.object({
+    channel: z.literal("run.execution.submit"),
+    payload: RunExecutionRequestSchema
+  }),
+  z.object({
+    channel: z.literal("run.execution.response"),
+    payload: RunExecutionResponseSchema
+  }),
+  z.object({
+    channel: z.literal("run.history.list"),
+    payload: RunHistoryRequestSchema
+  }),
+  z.object({
+    channel: z.literal("run.history.response"),
+    payload: RunHistoryResponseSchema
+  }),
+  z.object({
     channel: z.literal("policy.snapshot.get"),
     payload: PolicySnapshotRequestSchema
   }),
@@ -101,6 +278,15 @@ export type TaskIntentResponse = z.infer<typeof TaskIntentResponseSchema>;
 export type PolicySnapshotRequest = z.infer<typeof PolicySnapshotRequestSchema>;
 export type PolicySnapshotResponse = z.infer<typeof PolicySnapshotResponseSchema>;
 export type RunEventEnvelope = z.infer<typeof RunEventEnvelopeSchema>;
+export type RunExecutionRequest = z.infer<typeof RunExecutionRequestSchema>;
+export type RunExecutionResponse = z.infer<typeof RunExecutionResponseSchema>;
+export type RunHistoryRequest = z.infer<typeof RunHistoryRequestSchema>;
+export type RunHistoryResponse = z.infer<typeof RunHistoryResponseSchema>;
+export type TaskRoute = z.infer<typeof TaskRouteSchema>;
+export type DiffPreview = z.infer<typeof DiffPreviewSchema>;
+export type ApprovalRequest = z.infer<typeof ApprovalRequestSchema>;
+export type SimulationSummary = z.infer<typeof SimulationSummarySchema>;
+export type ApprovalDecisionResponse = z.infer<typeof ApprovalDecisionResponseSchema>;
 
 export function parseIpcEnvelope(input: unknown): IpcEnvelope {
   return IpcEnvelopeSchema.parse(input);

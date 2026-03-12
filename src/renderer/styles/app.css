@@ -246,6 +246,39 @@ button {
   margin-top: 18px;
 }
 
+.approval-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.decision-button {
+  border-radius: 999px;
+  border: 1px solid rgba(125, 156, 189, 0.22);
+  padding: 10px 14px;
+  color: #dbe8f6;
+  background: rgba(16, 27, 43, 0.9);
+}
+
+.decision-button:disabled {
+  opacity: 0.64;
+  cursor: progress;
+}
+
+.approval-receipt {
+  margin-top: 14px;
+  font-size: 0.92rem;
+}
+
+.approval-receipt-accepted {
+  color: #7fe0ad;
+}
+
+.approval-receipt-rejected {
+  color: #ff9d8b;
+}
+
 .primary-button,
 .secondary-button {
   min-width: 150px;
@@ -293,11 +326,40 @@ button {
   background: rgba(13, 24, 39, 0.82);
 }
 
+.summary-card-wide {
+  grid-column: 1 / -1;
+}
+
 .summary-card p,
 .page-section p,
 .detail-rail p {
   margin: 8px 0 0;
   color: #bfd0e1;
+}
+
+.artifact-list {
+  display: grid;
+  gap: 8px;
+}
+
+.diff-preview {
+  display: grid;
+  gap: 18px;
+}
+
+.diff-code {
+  margin: 0;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(134, 161, 191, 0.14);
+  background: rgba(5, 12, 22, 0.82);
+  color: #d8e7f7;
+  overflow: auto;
+  font-family: "Cascadia Code", "Consolas", monospace;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .telemetry-strip {

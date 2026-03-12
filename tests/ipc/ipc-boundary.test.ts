@@ -3,8 +3,13 @@ import { describe, expect, it } from "vitest";
 import { ipcContractMap, parseIpcEnvelope } from "../../src/shared/ipc";
 import {
   validApprovalEnvelope,
+  validApprovalDecisionResponseEnvelope,
   validPolicySnapshotRequestEnvelope,
   validPolicySnapshotResponseEnvelope,
+  validRunExecutionRequestEnvelope,
+  validRunExecutionResponseEnvelope,
+  validRunHistoryRequestEnvelope,
+  validRunHistoryResponseEnvelope,
   validRunEventEnvelope,
   validTaskIntentEnvelope,
   validTaskIntentResponseEnvelope
@@ -17,6 +22,21 @@ describe("IPC boundary contracts", () => {
       validTaskIntentResponseEnvelope
     );
     expect(parseIpcEnvelope(validApprovalEnvelope)).toEqual(validApprovalEnvelope);
+    expect(parseIpcEnvelope(validApprovalDecisionResponseEnvelope)).toEqual(
+      validApprovalDecisionResponseEnvelope
+    );
+    expect(parseIpcEnvelope(validRunExecutionRequestEnvelope)).toEqual(
+      validRunExecutionRequestEnvelope
+    );
+    expect(parseIpcEnvelope(validRunExecutionResponseEnvelope)).toEqual(
+      validRunExecutionResponseEnvelope
+    );
+    expect(parseIpcEnvelope(validRunHistoryRequestEnvelope)).toEqual(
+      validRunHistoryRequestEnvelope
+    );
+    expect(parseIpcEnvelope(validRunHistoryResponseEnvelope)).toEqual(
+      validRunHistoryResponseEnvelope
+    );
     expect(parseIpcEnvelope(validPolicySnapshotRequestEnvelope)).toEqual(
       validPolicySnapshotRequestEnvelope
     );
@@ -62,4 +82,3 @@ describe("IPC boundary contracts", () => {
     expect(Object.keys(ipcContractMap)).not.toContain("runCommand");
   });
 });
-
