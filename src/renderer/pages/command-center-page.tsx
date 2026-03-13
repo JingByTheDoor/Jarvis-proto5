@@ -1,6 +1,7 @@
 import type {
   ApprovalDecisionResponse,
   ApprovalRequest,
+  PlannerStatusResponse,
   RunExecutionResponse,
   TaskIntentResponse
 } from "../../shared/ipc";
@@ -24,6 +25,7 @@ export interface CommandCenterPageProps {
   readonly executionResponse: RunExecutionResponse | null;
   readonly runEvents: readonly RunEvent[];
   readonly lastIntentResponse: TaskIntentResponse | null;
+  readonly plannerStatus: PlannerStatusResponse | null;
 }
 
 const detailRailSections = [
@@ -55,7 +57,8 @@ export function CommandCenterPage(props: CommandCenterPageProps) {
     approvalError,
     pendingApprovalActionId,
     executionResponse,
-    runEvents
+    runEvents,
+    plannerStatus
   } = props;
   const compiledActions = lastIntentResponse?.manifest?.compiled_actions ?? [];
   const approvalCount = compiledActions.filter((action) => action.requires_approval).length;
@@ -64,6 +67,8 @@ export function CommandCenterPage(props: CommandCenterPageProps) {
   const simulationSummary = lastIntentResponse?.simulation_summary ?? null;
   const primaryDiffPreview = lastIntentResponse?.diff_previews[0] ?? null;
   const routeSummary = lastIntentResponse?.route ?? null;
+  const plannerAssistance = lastIntentResponse?.planner_assistance ?? null;
+  const visiblePlannerStatus = plannerAssistance?.provider_status ?? plannerStatus;
   const stateTrace = lastIntentResponse?.state_trace.join(" -> ") ?? "PLAN -> COMPILE -> SIMULATE";
   const planSummary =
     (lastIntentResponse?.plan?.summary ?? deferredComposerValue) || "Awaiting task input.";
@@ -179,6 +184,11 @@ export function CommandCenterPage(props: CommandCenterPageProps) {
           <article className="summary-card">
             <h3>Review State</h3>
             <p>{executionResponse?.workflow_state ?? "Awaiting execution."}</p>
+          </article>
+          <article className="summary-card">
+            <h3>Planner Assist</h3>
+            <p>{plannerAssistance?.status ?? visiblePlannerStatus?.mode ?? "not loaded"}</p>
+            <p>{plannerAssistance?.rationale ?? visiblePlannerStatus?.notes[0] ?? "Provider visibility appears here before optional systems broaden."}</p>
           </article>
         </div>
       </section>
@@ -469,6 +479,14 @@ export function CommandCenterPage(props: CommandCenterPageProps) {
           <h2 id="details-rail-surfaces">Secondary operational surfaces</h2>
         </div>
         <div className="rail-preview-grid">
+          <article className="rail-preview-card">
+            <h3>Current Model / Provider Snapshot</h3>
+            <p>
+              {visiblePlannerStatus
+                ? `${visiblePlannerStatus.provider_kind} / ${visiblePlannerStatus.model_name ?? "no model"} / ${visiblePlannerStatus.mode}`
+                : "Planner provider health has not loaded yet."}
+            </p>
+          </article>
           {detailRailSections.map((title) => (
             <article className="rail-preview-card" key={title}>
               <h3>{title}</h3>

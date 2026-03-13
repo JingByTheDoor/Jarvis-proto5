@@ -4,9 +4,13 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { searchLocalRecall } from "../../src/core/memory/basic-recall";
-import type { RunLogStore } from "../../src/core/events/run-log-store";
+import type {
+  RunLogDeleteResult,
+  RunLogExportResult,
+  RunLogStore
+} from "../../src/core/events/run-log-store";
 import type { RunLog } from "../../src/core/schemas";
-import { ISO_LATER, validRunLog } from "../fixtures";
+import { ISO_LATER, ISO_NOW, validRunLog } from "../fixtures";
 import { createTempRepo } from "../support/temp-repo";
 
 class MemoryRunLogStore implements RunLogStore {
@@ -18,6 +22,47 @@ class MemoryRunLogStore implements RunLogStore {
 
   listRunLogs(): RunLog[] {
     return [...this.runLogs];
+  }
+
+  deleteRunLog(_workspaceRoot: string, runId: string): RunLogDeleteResult {
+    return {
+      run_id: runId,
+      deleted: false,
+      deleted_paths: []
+    };
+  }
+
+  stageRunExport(_workspaceRoot: string, runId: string, exportedAt: string): RunLogExportResult {
+    return {
+      run_id: runId,
+      staged_export_path: `D:\\unused\\${runId}.json`,
+      bundle: {
+        version: 1,
+        run_id: runId,
+        workspace_root: "D:\\unused",
+        source_run_path: `D:\\unused\\${runId}.json`,
+        exported_at: exportedAt,
+        redaction_count: 0,
+        placeholders: [],
+        note: "Not used in recall tests.",
+        run_log: this.runLogs[0] ?? {
+          run_id: runId,
+          plan_id: "plan-unused",
+          manifest_id: "manifest-unused",
+          manifest_hash: "manifest-unused",
+          events: [],
+          attestations: [],
+          final_result: {
+            status: "failed",
+            summary: "Not used in recall tests."
+          },
+          artifacts: [],
+          started_at: ISO_NOW,
+          finished_at: ISO_NOW,
+          persistence_status: "execution_complete"
+        }
+      }
+    };
   }
 }
 

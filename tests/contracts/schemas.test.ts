@@ -8,11 +8,16 @@ import {
   validExecutionAttestation,
   validExecutionManifest,
   validMemoryRecord,
+  validPlannerAssistance,
+  validPlannerProviderStatus,
+  validPlannerSettingsUpdateRequest,
   validPlan,
+  validRunExportBundle,
   validRunEvent,
   validRunLog,
   validToolResult,
   validWorkflowProofGateStatus,
+  validWorkflowProofReportResponse,
   validWorkflowProofRecord,
   validWorkflowProofSummaryResponse
 } from "../fixtures";
@@ -36,12 +41,20 @@ const examples = {
   APPROVAL_DECISION: validApprovalDecision,
   RUN_EVENT: validRunEvent,
   RUN_LOG: validRunLog,
+  RUN_EXPORT_BUNDLE: validRunExportBundle,
   TOOL_RESULT: validToolResult,
   EXECUTION_ATTESTATION: validExecutionAttestation,
   MEMORY_RECORD: validMemoryRecord,
+  PLANNER_PROVIDER_STATUS: validPlannerProviderStatus,
+  PLANNER_PROVIDER_CONFIG: {
+    ...validPlannerSettingsUpdateRequest,
+    source: "session_override"
+  },
+  PLANNER_ASSISTANCE: validPlannerAssistance,
   WORKFLOW_PROOF_RECORD: validWorkflowProofRecord,
   WORKFLOW_PROOF_SUMMARY: validWorkflowProofSummaryResponse.summary,
-  WORKFLOW_PROOF_GATE_STATUS: validWorkflowProofGateStatus
+  WORKFLOW_PROOF_GATE_STATUS: validWorkflowProofGateStatus,
+  WORKFLOW_PROOF_REPORT: validWorkflowProofReportResponse
 } as const;
 
 const invalidExamples = {
@@ -89,6 +102,10 @@ const invalidExamples = {
     ...validRunLog,
     persistence_status: "saved"
   },
+  RUN_EXPORT_BUNDLE: {
+    ...validRunExportBundle,
+    exported_at: "not-a-date"
+  },
   TOOL_RESULT: {
     ...validToolResult,
     observed_effects: "not-an-array"
@@ -104,6 +121,19 @@ const invalidExamples = {
       verification_status: "verified"
     }
   },
+  PLANNER_PROVIDER_STATUS: {
+    ...validPlannerProviderStatus,
+    mode: "ready"
+  },
+  PLANNER_PROVIDER_CONFIG: {
+    ...validPlannerSettingsUpdateRequest,
+    endpoint_url: "not-a-url",
+    source: "session_override"
+  },
+  PLANNER_ASSISTANCE: {
+    ...validPlannerAssistance,
+    status: "used"
+  },
   WORKFLOW_PROOF_RECORD: {
     ...validWorkflowProofRecord,
     journey_kind: "not-a-real-kind"
@@ -115,6 +145,10 @@ const invalidExamples = {
   WORKFLOW_PROOF_GATE_STATUS: {
     ...validWorkflowProofGateStatus,
     overall_status: "ready"
+  },
+  WORKFLOW_PROOF_REPORT: {
+    ...validWorkflowProofReportResponse,
+    report_markdown: ""
   }
 } as const;
 
@@ -132,9 +166,14 @@ describe("schema registry", () => {
       "TOOL_RESULT",
       "EXECUTION_ATTESTATION",
       "MEMORY_RECORD",
+      "RUN_EXPORT_BUNDLE",
+      "PLANNER_PROVIDER_STATUS",
+      "PLANNER_PROVIDER_CONFIG",
+      "PLANNER_ASSISTANCE",
       "WORKFLOW_PROOF_RECORD",
       "WORKFLOW_PROOF_SUMMARY",
-      "WORKFLOW_PROOF_GATE_STATUS"
+      "WORKFLOW_PROOF_GATE_STATUS",
+      "WORKFLOW_PROOF_REPORT"
     ]);
   });
 

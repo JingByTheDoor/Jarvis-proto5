@@ -253,6 +253,35 @@ export const workflowJourneyKinds = [
 ] as const;
 export type WorkflowJourneyKind = (typeof workflowJourneyKinds)[number];
 
+export const adapterModes = [
+  "active",
+  "degraded",
+  "unavailable",
+  "null_adapter"
+] as const;
+export type AdapterMode = (typeof adapterModes)[number];
+
+export const plannerProviderKinds = [
+  "local_ollama",
+  "null_adapter"
+] as const;
+export type PlannerProviderKind = (typeof plannerProviderKinds)[number];
+
+export const plannerPreferenceSources = [
+  "built_in_default",
+  "environment",
+  "session_override"
+] as const;
+export type PlannerPreferenceSource = (typeof plannerPreferenceSources)[number];
+
+export const plannerAssistanceStatuses = [
+  "not_requested",
+  "normalized",
+  "fell_back",
+  "null_adapter"
+] as const;
+export type PlannerAssistanceStatus = (typeof plannerAssistanceStatuses)[number];
+
 export const proofGateCriterionStatuses = [
   "not_enough_data",
   "on_track",
@@ -266,3 +295,17 @@ export const proofGateOverallStatuses = [
   "candidate_ready"
 ] as const;
 export type ProofGateOverallStatus = (typeof proofGateOverallStatuses)[number];
+
+export const defaultRetentionPolicy = {
+  run_history_days: 30,
+  event_logs_days: 7,
+  cache_days: 3,
+  sensitive_session_cache_hours: 24
+} as const;
+
+export const sensitiveSessionDefaults = {
+  reduced_logging: true,
+  tier2_memory_writes_enabled: false,
+  tier3_analytics_writes_enabled: false,
+  minimal_summaries_only: true
+} as const;

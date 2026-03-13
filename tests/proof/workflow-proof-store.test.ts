@@ -81,6 +81,11 @@ describe("workflow proof store", () => {
 
       const persistedPath = path.join(repo.root, ".tmp", "cache", "workflow-proof.json");
       const summarySnapshot = workflowProofStore.getSummary(repo.root, 5);
+      const reportSnapshot = workflowProofStore.getReport(
+        repo.root,
+        5,
+        "2026-03-11T19:11:00.000Z"
+      );
 
       expect(fs.existsSync(persistedPath)).toBe(true);
       expect(summarySnapshot.summary.golden_workflow_attempts).toBe(2);
@@ -92,6 +97,9 @@ describe("workflow proof store", () => {
       expect(summarySnapshot.summary.resume_journeys).toBe(2);
       expect(summarySnapshot.gate_status.overall_status).toBe("collecting_evidence");
       expect(summarySnapshot.recent_journeys[0]?.journey_id).toBe("journey-inspect-1");
+      expect(reportSnapshot.generated_at).toBe("2026-03-11T19:11:00.000Z");
+      expect(reportSnapshot.report_markdown).toContain("## Gate Criteria");
+      expect(reportSnapshot.report_markdown).toContain("### journey-inspect-1");
     } finally {
       repo.cleanup();
     }

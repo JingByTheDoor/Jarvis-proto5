@@ -4,13 +4,19 @@ import { createJarvisDesktopApi } from "../../src/preload/bridge";
 import {
   validApprovalDecision,
   validApprovalDecisionResponse,
+  validPlannerProviderStatus,
+  validPlannerSettingsUpdateRequest,
+  validPlannerStatusResponseEnvelope,
   validPolicySnapshotResponseEnvelope,
   validRecallSearchResponse,
+  validRunDeleteResponse,
   validRunExecutionResponse,
+  validRunExportResponse,
   validRunEvent,
   validRunHistoryResponse,
   validTaskIntentResponseEnvelope,
   validWorkflowProofRecord,
+  validWorkflowProofReportResponse,
   validWorkflowProofSummaryResponse
 } from "../fixtures";
 
@@ -113,10 +119,15 @@ describe("preload bridge", () => {
         .fn()
         .mockResolvedValueOnce(validRunExecutionResponse)
         .mockResolvedValueOnce(validRunHistoryResponse)
+        .mockResolvedValueOnce(validRunDeleteResponse)
+        .mockResolvedValueOnce(validRunExportResponse)
         .mockResolvedValueOnce(validRecallSearchResponse)
         .mockResolvedValueOnce(validWorkflowProofRecord)
         .mockResolvedValueOnce(validWorkflowProofSummaryResponse)
-        .mockResolvedValueOnce(validPolicySnapshotResponseEnvelope.payload),
+        .mockResolvedValueOnce(validWorkflowProofReportResponse)
+        .mockResolvedValueOnce(validPolicySnapshotResponseEnvelope.payload)
+        .mockResolvedValueOnce(validPlannerProviderStatus)
+        .mockResolvedValueOnce(validPlannerProviderStatus),
       send: vi.fn(),
       on: vi.fn(),
       removeListener: vi.fn()
@@ -138,6 +149,20 @@ describe("preload bridge", () => {
     ).resolves.toEqual(validRunHistoryResponse);
 
     await expect(
+      desktopApi.deleteRunHistoryEntry({
+        workspace_root: "D:\\Jarvis-proto5 repo\\Jarvis-proto5",
+        run_id: "run-1"
+      })
+    ).resolves.toEqual(validRunDeleteResponse);
+
+    await expect(
+      desktopApi.exportRunHistoryEntry({
+        workspace_root: "D:\\Jarvis-proto5 repo\\Jarvis-proto5",
+        run_id: "run-1"
+      })
+    ).resolves.toEqual(validRunExportResponse);
+
+    await expect(
       desktopApi.searchLocalRecall({
         workspace_root: "D:\\Jarvis-proto5 repo\\Jarvis-proto5",
         query: "resume",
@@ -157,9 +182,26 @@ describe("preload bridge", () => {
     ).resolves.toEqual(validWorkflowProofSummaryResponse);
 
     await expect(
+      desktopApi.getWorkflowProofReport({
+        workspace_root: "D:\\Jarvis-proto5 repo\\Jarvis-proto5",
+        limit: 5
+      })
+    ).resolves.toEqual(validWorkflowProofReportResponse);
+
+    await expect(
       desktopApi.getPolicySnapshot({
         session_id: "session-1"
       })
     ).resolves.toEqual(validPolicySnapshotResponseEnvelope.payload);
+
+    await expect(
+      desktopApi.getPlannerStatus({
+        session_id: "session-1"
+      })
+    ).resolves.toEqual(validPlannerStatusResponseEnvelope.payload);
+
+    await expect(
+      desktopApi.updatePlannerSettings(validPlannerSettingsUpdateRequest)
+    ).resolves.toEqual(validPlannerProviderStatus);
   });
 });

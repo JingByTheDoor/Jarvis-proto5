@@ -70,6 +70,20 @@ export function parseGuardedShellInstruction(task: string): GuardedShellInstruct
   };
 }
 
+export function shouldAttemptPlannerNormalization(task: string): boolean {
+  const normalizedTask = task.trim();
+
+  if (
+    parseSupportedEditInstruction(normalizedTask) ||
+    parseGuardedShellInstruction(normalizedTask) ||
+    dangerousIntentPattern.test(normalizedTask)
+  ) {
+    return false;
+  }
+
+  return routeTaskIntent(normalizedTask).chosen_route === "manual_confirmation_required";
+}
+
 export function routeTaskIntent(task: string): TaskRoute {
   const normalizedTask = task.trim();
   const editInstruction = parseSupportedEditInstruction(normalizedTask);

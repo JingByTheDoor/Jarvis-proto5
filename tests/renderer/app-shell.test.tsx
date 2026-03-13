@@ -16,11 +16,16 @@ import { workflowSequence } from "../../src/shared/constants";
 import {
   validApprovalDecisionResponse,
   ISO_APP_STARTED,
+  validPlannerAssistance,
+  validPlannerProviderStatus,
   validRecallSearchResponse,
+  validRunDeleteResponse,
   validRunEvent,
   validRunExecutionResponse,
+  validRunExportResponse,
   validRunHistoryResponse,
   validTaskIntentResponseEnvelope,
+  validWorkflowProofReportResponse,
   validWorkflowProofSummaryResponse
 } from "../fixtures";
 
@@ -29,11 +34,24 @@ function createDesktopApiStub(): JarvisDesktopApi {
     async () => validTaskIntentResponseEnvelope.payload
   ) as unknown as JarvisDesktopApi["submitTaskIntent"];
   const getPolicySnapshot = vi.fn(async () => ({
-    version: "phase-6-proof-gate",
+    version: "phase-6-planner-assist",
     workflow: workflowSequence,
     local_first: true as const,
     approval_required_for_risky_actions: true as const,
-    app_started_at: ISO_APP_STARTED
+    app_started_at: ISO_APP_STARTED,
+    retention_policy: {
+      run_history_days: 30,
+      event_logs_days: 7,
+      cache_days: 3,
+      sensitive_session_cache_hours: 24,
+      export_staging_encrypted_at_rest: true as const
+    },
+    sensitive_session_defaults: {
+      reduced_logging: true as const,
+      tier2_memory_writes_enabled: false as const,
+      tier3_analytics_writes_enabled: false as const,
+      minimal_summaries_only: true as const
+    }
   })) as unknown as JarvisDesktopApi["getPolicySnapshot"];
 
   return {
@@ -41,9 +59,14 @@ function createDesktopApiStub(): JarvisDesktopApi {
     submitApprovalDecision: vi.fn(async () => validApprovalDecisionResponse),
     executeManifest: vi.fn(async () => validRunExecutionResponse),
     listRunHistory: vi.fn(async () => validRunHistoryResponse),
+    deleteRunHistoryEntry: vi.fn(async () => validRunDeleteResponse),
+    exportRunHistoryEntry: vi.fn(async () => validRunExportResponse),
     searchLocalRecall: vi.fn(async () => validRecallSearchResponse),
     recordWorkflowProof: vi.fn(async (payload) => payload),
     getWorkflowProofSummary: vi.fn(async () => validWorkflowProofSummaryResponse),
+    getWorkflowProofReport: vi.fn(async () => validWorkflowProofReportResponse),
+    getPlannerStatus: vi.fn(async () => validPlannerProviderStatus),
+    updatePlannerSettings: vi.fn(async () => validPlannerProviderStatus),
     getPolicySnapshot,
     subscribeToRunEvents: vi.fn(() => () => {})
   };
@@ -157,6 +180,7 @@ function createEditDesktopApiStub(): JarvisDesktopApi {
           "--- D:\\Jarvis-proto5 repo\\Jarvis-proto5\\README.md\n+++ D:\\Jarvis-proto5 repo\\Jarvis-proto5\\README.md\n@@\n-hello\n+hello jarvis"
       }
     ],
+    planner_assistance: validPlannerAssistance,
     preview_generated_at: "2026-03-11T18:00:00.000Z"
   })) as unknown as JarvisDesktopApi["submitTaskIntent"];
 
@@ -169,15 +193,33 @@ function createEditDesktopApiStub(): JarvisDesktopApi {
     })),
     executeManifest: vi.fn(async () => validRunExecutionResponse),
     listRunHistory: vi.fn(async () => validRunHistoryResponse),
+    deleteRunHistoryEntry: vi.fn(async () => validRunDeleteResponse),
+    exportRunHistoryEntry: vi.fn(async () => validRunExportResponse),
     searchLocalRecall: vi.fn(async () => validRecallSearchResponse),
     recordWorkflowProof: vi.fn(async (payload) => payload),
     getWorkflowProofSummary: vi.fn(async () => validWorkflowProofSummaryResponse),
+    getWorkflowProofReport: vi.fn(async () => validWorkflowProofReportResponse),
+    getPlannerStatus: vi.fn(async () => validPlannerProviderStatus),
+    updatePlannerSettings: vi.fn(async () => validPlannerProviderStatus),
     getPolicySnapshot: vi.fn(async () => ({
-      version: "phase-6-proof-gate",
+      version: "phase-6-planner-assist",
       workflow: workflowSequence,
       local_first: true as const,
       approval_required_for_risky_actions: true as const,
-      app_started_at: ISO_APP_STARTED
+      app_started_at: ISO_APP_STARTED,
+      retention_policy: {
+        run_history_days: 30,
+        event_logs_days: 7,
+        cache_days: 3,
+        sensitive_session_cache_hours: 24,
+        export_staging_encrypted_at_rest: true as const
+      },
+      sensitive_session_defaults: {
+        reduced_logging: true as const,
+        tier2_memory_writes_enabled: false as const,
+        tier3_analytics_writes_enabled: false as const,
+        minimal_summaries_only: true as const
+      }
     })) as unknown as JarvisDesktopApi["getPolicySnapshot"],
     subscribeToRunEvents: vi.fn(() => () => {})
   };
@@ -207,15 +249,33 @@ function createExecutingDesktopApiStub(): JarvisDesktopApi {
       return validRunExecutionResponse;
     }),
     listRunHistory: vi.fn(async () => validRunHistoryResponse),
+    deleteRunHistoryEntry: vi.fn(async () => validRunDeleteResponse),
+    exportRunHistoryEntry: vi.fn(async () => validRunExportResponse),
     searchLocalRecall: vi.fn(async () => validRecallSearchResponse),
     recordWorkflowProof: vi.fn(async (payload) => payload),
     getWorkflowProofSummary: vi.fn(async () => validWorkflowProofSummaryResponse),
+    getWorkflowProofReport: vi.fn(async () => validWorkflowProofReportResponse),
+    getPlannerStatus: vi.fn(async () => validPlannerProviderStatus),
+    updatePlannerSettings: vi.fn(async () => validPlannerProviderStatus),
     getPolicySnapshot: vi.fn(async () => ({
-      version: "phase-6-proof-gate",
+      version: "phase-6-planner-assist",
       workflow: workflowSequence,
       local_first: true as const,
       approval_required_for_risky_actions: true as const,
-      app_started_at: ISO_APP_STARTED
+      app_started_at: ISO_APP_STARTED,
+      retention_policy: {
+        run_history_days: 30,
+        event_logs_days: 7,
+        cache_days: 3,
+        sensitive_session_cache_hours: 24,
+        export_staging_encrypted_at_rest: true as const
+      },
+      sensitive_session_defaults: {
+        reduced_logging: true as const,
+        tier2_memory_writes_enabled: false as const,
+        tier3_analytics_writes_enabled: false as const,
+        minimal_summaries_only: true as const
+      }
     })) as unknown as JarvisDesktopApi["getPolicySnapshot"],
     subscribeToRunEvents: vi.fn((listener) => {
       runEventListener = listener as unknown as typeof runEventListener;
@@ -239,7 +299,7 @@ describe("Phase 6 renderer shell", () => {
 
     render(<JarvisApp />);
 
-    await screen.findByText("phase-6-proof-gate");
+    await screen.findByText("phase-6-planner-assist");
     expect(screen.getByRole("heading", { name: /shortest safe path from task to review/i })).toBeDefined();
     expect(screen.getByLabelText(/task composer \/ input/i)).toBeDefined();
     expect(screen.getByRole("button", { name: "Preview" })).toBeDefined();
@@ -284,7 +344,7 @@ describe("Phase 6 renderer shell", () => {
 
     render(<JarvisApp />);
 
-    await screen.findByText("phase-6-proof-gate");
+    await screen.findByText("phase-6-planner-assist");
     fireEvent.click(screen.getByRole("button", { name: "Show details" }));
 
     expect(screen.getByRole("heading", { name: /progressive disclosure surfaces/i })).toBeDefined();
@@ -307,19 +367,73 @@ describe("Phase 6 renderer shell", () => {
     expect(
       screen.getByRole("heading", { name: /adapters stay visible even when unavailable/i })
     ).toBeDefined();
+    expect(screen.getByText(/local_ollama \(active\)/i)).toBeDefined();
+    expect(screen.getByText(/Available models: qwen2.5:3b, qwen2.5:1.5b/i)).toBeDefined();
 
     fireEvent.click(screen.getByRole("button", { name: /^Settings/i }));
     expect(
       screen.getByRole("heading", { name: /retention, approval, and session posture stay explicit/i })
     ).toBeDefined();
+    expect(screen.getByDisplayValue("qwen2.5:3b")).toBeDefined();
+    expect(screen.getByDisplayValue("http://127.0.0.1:11434")).toBeDefined();
     expect(screen.getByText(/1 of 1 golden workflow attempt\(s\) reached review_ready/i)).toBeDefined();
     expect(screen.getByText(/Status: collecting evidence/i)).toBeDefined();
-    expect(screen.getByText(/Cold start -> composer median: 500 ms/i)).toBeDefined();
-    expect(screen.getByText(/Preview -> approval median: 2000 ms/i)).toBeDefined();
-    expect(screen.getByText(/Repeat task -> preview median: 1000 ms/i)).toBeDefined();
-    expect(screen.getByText(/Review-ready in window: 1 \/ 3/i)).toBeDefined();
-    expect(screen.getByText(/Resumed samples: 1 \/ 1/i)).toBeDefined();
-    expect(screen.getByText(/At least one resumed journey reached review_ready/i)).toBeDefined();
+    expect(screen.getByText(/\.tmp\/runs: 30 days \| \.tmp\/logs: 7 days/i)).toBeDefined();
+    expect(screen.getByText(/\.tmp\/cache: 3 days \| sensitive session cache: 24 hours/i)).toBeDefined();
+    expect(screen.getByText(/Run exports are staged under encrypted-at-rest local storage/i)).toBeDefined();
+    expect(screen.getByText(/Reduced logging: on \| minimal summaries only: yes/i)).toBeDefined();
+    expect(screen.getByText(/Tier 2 memory writes: disabled \| Tier 3 analytics writes: disabled/i)).toBeDefined();
+    expect(screen.getAllByText(/Cold start -> composer median: 500 ms/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Preview -> approval median: 2000 ms/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Repeat task -> preview median: 1000 ms/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Review-ready in window: 1 \/ 3/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Resumed samples: 1 \/ 1/i).length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText(/At least one resumed journey reached review_ready/i).length
+    ).toBeGreaterThan(0);
+    expect(screen.getByText(/Local Proof Report/i)).toBeDefined();
+    expect(screen.getByLabelText("Local proof report").textContent).toContain(
+      "# Workflow Proof Report"
+    );
+    },
+    15000
+  );
+
+  it(
+    "exposes per-run delete and export controls through the typed desktop API",
+    async () => {
+      const desktopApi = createDesktopApiStub();
+      window.jarvisDesktop = desktopApi;
+
+      render(<JarvisApp />);
+
+      await screen.findByText("phase-6-planner-assist");
+      fireEvent.click(screen.getByRole("button", { name: /Tasks & Projects/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Export run" })).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Export run" }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Staged a sanitized encrypted export for run-1/i)).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Delete run" }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Deleted local review artifacts for run-1/i)).toBeDefined();
+      });
+
+      expect(desktopApi.exportRunHistoryEntry).toHaveBeenCalledWith({
+        workspace_root: "D:\\Jarvis-proto5 repo\\Jarvis-proto5",
+        run_id: "run-1"
+      });
+      expect(desktopApi.deleteRunHistoryEntry).toHaveBeenCalledWith({
+        workspace_root: "D:\\Jarvis-proto5 repo\\Jarvis-proto5",
+        run_id: "run-1"
+      });
     },
     15000
   );
@@ -331,7 +445,7 @@ describe("Phase 6 renderer shell", () => {
 
     render(<JarvisApp />);
 
-    await screen.findByText("phase-6-proof-gate");
+    await screen.findByText("phase-6-planner-assist");
     fireEvent.click(screen.getByRole("button", { name: "Preview" }));
 
     await waitFor(() => {
@@ -358,7 +472,7 @@ describe("Phase 6 renderer shell", () => {
 
     render(<JarvisApp />);
 
-    await screen.findByText("phase-6-proof-gate");
+    await screen.findByText("phase-6-planner-assist");
     fireEvent.click(screen.getByRole("button", { name: "Preview" }));
 
     await waitFor(() => {
@@ -393,7 +507,7 @@ describe("Phase 6 renderer shell", () => {
 
     render(<JarvisApp />);
 
-    await screen.findByText("phase-6-proof-gate");
+    await screen.findByText("phase-6-planner-assist");
     fireEvent.click(screen.getByRole("button", { name: "Preview" }));
 
     await waitFor(() => {
@@ -436,7 +550,7 @@ describe("Phase 6 renderer shell", () => {
 
       render(<JarvisApp />);
 
-      await screen.findByText("phase-6-proof-gate");
+      await screen.findByText("phase-6-planner-assist");
       fireEvent.click(screen.getByRole("button", { name: /Tasks & Projects/i }));
 
       await waitFor(() => {

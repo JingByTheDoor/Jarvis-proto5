@@ -293,6 +293,7 @@ Rules:
 - Proof-gate evaluation remains conservative and local-only: `candidate_ready` is allowed only after enough recent golden-workflow evidence exists, recent latency trends do not regress, recent workflow-step and click medians stay below the local proof thresholds, and at least one resumed journey reaches `review_ready`.
 - The local proof gate must explicitly track cold start to usable composer, task to preview, preview to approval, approval to visible first result, steps/clicks, and repeat-task speed with context reuse before broader expansion opens.
 - Every proof-gate criterion must remain inspectable: sample windows, required counts, success counts, recent/previous medians, and threshold medians belong in typed local proof data rather than being implied only through prose.
+- Consolidated proof reports may be derived from the encrypted local proof store, but they remain typed, deterministic, and non-persistent by default so proof review does not weaken encrypted-at-rest posture.
 - Advanced routing, durable memory, challenger logic, Tier 2 memory, Tier 3 analytics, and optional providers remain blocked until the local proof gate shows the golden workflow is stable and low-friction.
 
 ## Naming Conventions
@@ -312,6 +313,19 @@ Rules:
 - Null adapters are real implementations and must return deterministic unavailable responses.
 - Optional adapters never gate the base workflow.
 - Core pages depend only on local state, Tier 1 memory, and run logs.
+
+## Planner Assist
+
+Local planner assistance is optional and non-authoritative.
+
+Rules:
+
+- Planner assistance may normalize natural-language tasks into the narrow supported v1 task shapes only.
+- Planner output never carries approval authority, routing authority for risky work, or execution authority.
+- Deterministic compile, simulation, approval, execution, attestation, and review remain authoritative even when planner assistance is active.
+- Explicit supported task text bypasses the planner; deterministic routing stays first for already-supported shapes.
+- The current planner adapter is loopback-only and Windows-local by policy in this slice.
+- Null-adapter planner behavior must remain deterministic and non-throwing on normal UI paths.
 
 ## Guarded Shell
 
@@ -378,10 +392,12 @@ Execution runtime rules:
 - Non-trivial actions require both a valid approval record and a freshly issued capability token bound to the same run, action, approval signature, execution hash, and session.
 - Live execution visibility uses structured `RUN_EVENT` records only; renderer surfaces never receive raw shell or runtime handles.
 - Persisted run logs live under `.tmp/runs/<run_id>.json`, remain encrypted at rest, and include events, final result, attestations, artifacts, and persistence status.
+- Sanitized per-run exports stage under `.tmp/exports/<run_id>.json`, remain encrypted at rest, and never bypass redaction before becoming operator-visible.
 - Typed-tool attestation compares the approved execution hash against the observed execution hash and records any deviation classes explicitly.
 - `review_ready` requires successful execution, required attestation, and persisted review state.
 - If execution succeeds but run-log persistence fails, the result and attestation remain visible, `persisted_run_path` stays null, and the workflow falls back to `execution_complete` instead of falsely claiming `review_ready`.
 - Results, persisted paths, and artifacts must stay visible in the Command Center and Tasks & Projects review surfaces.
+- Operators must have per-run delete controls for persisted review artifacts and per-run export controls that stage a sanitized local export bundle without exposing privileged plaintext storage by default.
 
 ## Retention and Sensitive Session
 
@@ -398,6 +414,8 @@ Sensitive session mode:
 - disables Tier 3 analytics writes by default
 - stores only minimal summaries
 - shortens cache TTL to 24 hours
+
+Retention posture must remain visible in Settings, including default TTLs for `.tmp/runs`, `.tmp/logs`, `.tmp/cache`, export-staging encryption posture, and the current sensitive-session defaults.
 
 ## Encrypted At Rest
 

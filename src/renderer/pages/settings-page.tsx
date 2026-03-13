@@ -1,8 +1,26 @@
-import type { WorkflowProofSummaryResponse } from "../../shared/ipc";
+import type {
+  PlannerSettingsUpdateRequest,
+  PlannerStatusResponse,
+  PolicySnapshotResponse,
+  WorkflowProofReportResponse,
+  WorkflowProofSummaryResponse
+} from "../../shared/ipc";
 
 export interface SettingsPageProps {
+  readonly policySnapshot: PolicySnapshotResponse | null;
+  readonly policyError: string | null;
   readonly proofSummary: WorkflowProofSummaryResponse | null;
   readonly proofError: string | null;
+  readonly proofReport: WorkflowProofReportResponse | null;
+  readonly proofReportError: string | null;
+  readonly plannerStatus: PlannerStatusResponse | null;
+  readonly plannerError: string | null;
+  readonly plannerDraft: PlannerSettingsUpdateRequest;
+  readonly plannerSaveMessage: string | null;
+  readonly onPlannerDraftChange: (
+    patch: Partial<PlannerSettingsUpdateRequest>
+  ) => void;
+  readonly onPlannerSettingsApply: () => void;
 }
 
 type WorkflowProofGateCriterion = WorkflowProofSummaryResponse["gate_status"]["stability"];
@@ -46,10 +64,25 @@ function formatMedianLine(criterion: WorkflowProofGateCriterion): string | null 
 }
 
 export function SettingsPage(props: SettingsPageProps) {
-  const { proofSummary, proofError } = props;
+  const {
+    policySnapshot,
+    policyError,
+    proofSummary,
+    proofError,
+    proofReport,
+    proofReportError,
+    plannerStatus,
+    plannerError,
+    plannerDraft,
+    plannerSaveMessage,
+    onPlannerDraftChange,
+    onPlannerSettingsApply
+  } = props;
   const summary = proofSummary?.summary ?? null;
   const gateStatus = proofSummary?.gate_status ?? null;
   const recentJourneys = proofSummary?.recent_journeys ?? [];
+  const retentionPolicy = policySnapshot?.retention_policy ?? null;
+  const sensitiveSessionDefaults = policySnapshot?.sensitive_session_defaults ?? null;
   const criterionCards = gateStatus
     ? [
         {
@@ -133,6 +166,19 @@ export function SettingsPage(props: SettingsPageProps) {
           </p>
         </article>
         <article className="summary-card">
+          <h3>Planner Provider</h3>
+          <p>
+            {plannerStatus
+              ? `${plannerStatus.provider_kind} / ${plannerStatus.model_name ?? "no model"}`
+              : "Planner provider visibility loads here."}
+          </p>
+          <p>
+            {plannerError ??
+              plannerStatus?.notes[0] ??
+              "Local planner configuration stays optional and non-blocking."}
+          </p>
+        </article>
+        <article className="summary-card">
           <h3>Operator Friction</h3>
           <p>Median steps: {formatMetric(summary?.median_workflow_step_count ?? null, "")}</p>
           <p>Median clicks: {formatMetric(summary?.median_operator_click_count ?? null, "")}</p>
@@ -147,6 +193,24 @@ export function SettingsPage(props: SettingsPageProps) {
           <p>
             Repeat task {"->"} preview median:{" "}
             {formatMetric(summary?.median_repeat_task_to_preview_ms ?? null, " ms")}
+          </p>
+        </article>
+        <article className="summary-card">
+          <h3>Retention Defaults</h3>
+          <p>
+            {retentionPolicy
+              ? `.tmp/runs: ${retentionPolicy.run_history_days} days | .tmp/logs: ${retentionPolicy.event_logs_days} days`
+              : "Retention defaults load from the policy snapshot."}
+          </p>
+          <p>
+            {retentionPolicy
+              ? `.tmp/cache: ${retentionPolicy.cache_days} days | sensitive session cache: ${retentionPolicy.sensitive_session_cache_hours} hours`
+              : policyError ?? "Retention stays visible in Settings before optional storage tiers broaden."}
+          </p>
+          <p>
+            {retentionPolicy?.export_staging_encrypted_at_rest
+              ? "Run exports are staged under encrypted-at-rest local storage before the operator moves them elsewhere."
+              : "Export staging posture is unavailable."}
           </p>
         </article>
       </div>
@@ -194,6 +258,61 @@ export function SettingsPage(props: SettingsPageProps) {
           </article>
         )}
         <article className="summary-card summary-card-wide">
+          <h3>Planner Selection</h3>
+          <label className="settings-field" htmlFor="planner-provider-kind">
+            <span>Provider</span>
+            <select
+              id="planner-provider-kind"
+              value={plannerDraft.provider_kind}
+              onChange={(event) =>
+                onPlannerDraftChange({
+                  provider_kind: event.target.value as PlannerSettingsUpdateRequest["provider_kind"]
+                })
+              }
+            >
+              <option value="local_ollama">local_ollama</option>
+              <option value="null_adapter">null_adapter</option>
+            </select>
+          </label>
+          <label className="settings-field" htmlFor="planner-model-name">
+            <span>Model</span>
+            <input
+              id="planner-model-name"
+              type="text"
+              value={plannerDraft.model_name ?? ""}
+              disabled={plannerDraft.provider_kind === "null_adapter"}
+              onChange={(event) =>
+                onPlannerDraftChange({
+                  model_name: event.target.value
+                })
+              }
+            />
+          </label>
+          <label className="settings-field" htmlFor="planner-endpoint-url">
+            <span>Endpoint</span>
+            <input
+              id="planner-endpoint-url"
+              type="text"
+              value={plannerDraft.endpoint_url ?? ""}
+              disabled={plannerDraft.provider_kind === "null_adapter"}
+              onChange={(event) =>
+                onPlannerDraftChange({
+                  endpoint_url: event.target.value
+                })
+              }
+            />
+          </label>
+          <div className="action-row">
+            <button type="button" className="secondary-button" onClick={onPlannerSettingsApply}>
+              Apply planner config
+            </button>
+          </div>
+          <p>
+            {plannerSaveMessage ??
+              "Planner settings are session-local in this slice; restart falls back to env or built-in defaults."}
+          </p>
+        </article>
+        <article className="summary-card summary-card-wide">
           <h3>Blocking Reasons</h3>
           <p>
             {(gateStatus?.blocking_reasons.length ?? 0) > 0
@@ -204,6 +323,19 @@ export function SettingsPage(props: SettingsPageProps) {
             {gateStatus?.assumption_note ??
               "Assumptions stay explicit whenever the local proof gate adds conservative readiness thresholds."}
           </p>
+        </article>
+        <article className="summary-card summary-card-wide">
+          <h3>Local Proof Report</h3>
+          <p>
+            {proofReport
+              ? `Generated at ${proofReport.generated_at} for ${proofReport.workspace_root}.`
+              : "The local proof report will appear once proof data can be summarized."}
+          </p>
+          <pre className="report-code" aria-label="Local proof report">
+            {proofReport?.report_markdown ??
+              proofReportError ??
+              "No typed proof report is available yet."}
+          </pre>
         </article>
         {recentJourneys.length > 0 ? (
           recentJourneys.map((journey) => (
@@ -226,7 +358,16 @@ export function SettingsPage(props: SettingsPageProps) {
         )}
         <article className="summary-card">
           <h3>Sensitive Session</h3>
-          <p>Retention and reduced-persistence controls stay explicit while the proof gate is being measured locally.</p>
+          <p>
+            {sensitiveSessionDefaults
+              ? `Reduced logging: ${sensitiveSessionDefaults.reduced_logging ? "on" : "off"} | minimal summaries only: ${sensitiveSessionDefaults.minimal_summaries_only ? "yes" : "no"}`
+              : "Sensitive-session defaults load from the local policy snapshot."}
+          </p>
+          <p>
+            {sensitiveSessionDefaults
+              ? `Tier 2 memory writes: ${sensitiveSessionDefaults.tier2_memory_writes_enabled ? "enabled" : "disabled"} | Tier 3 analytics writes: ${sensitiveSessionDefaults.tier3_analytics_writes_enabled ? "enabled" : "disabled"}`
+              : "Reduced-persistence controls stay explicit while the proof gate is being measured locally."}
+          </p>
         </article>
       </div>
     </section>

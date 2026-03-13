@@ -4,18 +4,28 @@ import { ipcContractMap, parseIpcEnvelope } from "../../src/shared/ipc";
 import {
   validApprovalEnvelope,
   validApprovalDecisionResponseEnvelope,
+  validPlannerSettingsUpdateRequestEnvelope,
+  validPlannerSettingsUpdateResponseEnvelope,
+  validPlannerStatusRequestEnvelope,
+  validPlannerStatusResponseEnvelope,
   validPolicySnapshotRequestEnvelope,
   validPolicySnapshotResponseEnvelope,
   validRecallSearchRequestEnvelope,
   validRecallSearchResponseEnvelope,
+  validRunDeleteRequestEnvelope,
+  validRunDeleteResponseEnvelope,
   validRunExecutionRequestEnvelope,
   validRunExecutionResponseEnvelope,
+  validRunExportRequestEnvelope,
+  validRunExportResponseEnvelope,
   validRunHistoryRequestEnvelope,
   validRunHistoryResponseEnvelope,
   validRunEventEnvelope,
   validTaskIntentEnvelope,
   validTaskIntentResponseEnvelope,
   validWorkflowProofRecordEnvelope,
+  validWorkflowProofReportRequestEnvelope,
+  validWorkflowProofReportResponseEnvelope,
   validWorkflowProofSummaryRequestEnvelope,
   validWorkflowProofSummaryResponseEnvelope
 } from "../fixtures";
@@ -42,6 +52,18 @@ describe("IPC boundary contracts", () => {
     expect(parseIpcEnvelope(validRunHistoryResponseEnvelope)).toEqual(
       validRunHistoryResponseEnvelope
     );
+    expect(parseIpcEnvelope(validRunDeleteRequestEnvelope)).toEqual(
+      validRunDeleteRequestEnvelope
+    );
+    expect(parseIpcEnvelope(validRunDeleteResponseEnvelope)).toEqual(
+      validRunDeleteResponseEnvelope
+    );
+    expect(parseIpcEnvelope(validRunExportRequestEnvelope)).toEqual(
+      validRunExportRequestEnvelope
+    );
+    expect(parseIpcEnvelope(validRunExportResponseEnvelope)).toEqual(
+      validRunExportResponseEnvelope
+    );
     expect(parseIpcEnvelope(validRecallSearchRequestEnvelope)).toEqual(
       validRecallSearchRequestEnvelope
     );
@@ -57,11 +79,29 @@ describe("IPC boundary contracts", () => {
     expect(parseIpcEnvelope(validWorkflowProofSummaryResponseEnvelope)).toEqual(
       validWorkflowProofSummaryResponseEnvelope
     );
+    expect(parseIpcEnvelope(validWorkflowProofReportRequestEnvelope)).toEqual(
+      validWorkflowProofReportRequestEnvelope
+    );
+    expect(parseIpcEnvelope(validWorkflowProofReportResponseEnvelope)).toEqual(
+      validWorkflowProofReportResponseEnvelope
+    );
     expect(parseIpcEnvelope(validPolicySnapshotRequestEnvelope)).toEqual(
       validPolicySnapshotRequestEnvelope
     );
     expect(parseIpcEnvelope(validPolicySnapshotResponseEnvelope)).toEqual(
       validPolicySnapshotResponseEnvelope
+    );
+    expect(parseIpcEnvelope(validPlannerStatusRequestEnvelope)).toEqual(
+      validPlannerStatusRequestEnvelope
+    );
+    expect(parseIpcEnvelope(validPlannerStatusResponseEnvelope)).toEqual(
+      validPlannerStatusResponseEnvelope
+    );
+    expect(parseIpcEnvelope(validPlannerSettingsUpdateRequestEnvelope)).toEqual(
+      validPlannerSettingsUpdateRequestEnvelope
+    );
+    expect(parseIpcEnvelope(validPlannerSettingsUpdateResponseEnvelope)).toEqual(
+      validPlannerSettingsUpdateResponseEnvelope
     );
     expect(parseIpcEnvelope(validRunEventEnvelope)).toEqual(validRunEventEnvelope);
   });

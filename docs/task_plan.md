@@ -2,7 +2,7 @@
 
 ## Current Focus
 
-- Phase 6 Slice D: make local proof-gate evidence windows inspectable.
+- Phase 6 Slice G: add per-run delete/export controls and explicit retention visibility without broadening advanced routing or optional systems.
 
 ## Scope
 
@@ -10,7 +10,10 @@
 - Track task-to-preview latency, approval-to-first-result latency, execute-to-first-result latency, and operator steps/clicks.
 - Track cold start to usable composer, preview-to-approval latency, and repeat-task speed with context reuse in the same local proof records.
 - Track whether resume-from-recall is being used and whether resumed journeys reach `review_ready`.
-- Surface proof-gate summary data, criterion evidence windows, and a conservative local gate verdict in the UI without broadening routing, memory tiers, or optional providers.
+- Surface proof-gate summary data, criterion evidence windows, a conservative local gate verdict, and a consolidated typed proof report in the UI without broadening routing, memory tiers, or optional providers.
+- Add one optional local planner adapter that can normalize natural-language tasks into the existing supported v1 typed routes while leaving deterministic compile, simulation, approval, execution, attestation, and review in control.
+- Surface planner/provider health, null-adapter behavior, and session-local provider/model selection in Connections, Settings, and the Command Center.
+- Add typed per-run delete/export controls for persisted run review data and make retention plus sensitive-session defaults explicit in Settings.
 - Keep advanced routing, durable memory, challenger logic, and optional adapters blocked behind the proof gate from the master sheet.
 
 ## Explicit Deferrals
@@ -87,3 +90,21 @@
 - Proof-gate criteria now carry typed sample counts, required counts, success counts, recent/previous medians, and threshold medians so blocked readiness can be inspected numerically.
 - The Settings proof section now acts as a local evidence board rather than a prose-only verdict, which keeps the proof gate legible while broader expansion remains blocked.
 - No routing, memory-tier, challenger, or optional-provider broadening is allowed until these inspectable criteria are satisfied by real local journeys.
+
+## Phase 6 Slice E Notes
+
+- Proof review now has a consolidated typed local report that summarizes summary metrics, gate criteria, blocking reasons, recent journeys, and assumption notes in deterministic order.
+- Assumption: the proof report remains non-persistent by default so review tooling does not introduce a new plaintext storage path outside the encrypted proof store.
+- No advanced routing, durable memory, challenger, or optional-provider work is allowed until real local journeys satisfy the underlying proof criteria, regardless of report availability.
+
+## Phase 6 Slice F Notes
+
+- A narrow local planner adapter now exists only to normalize natural-language task intake into the already-supported v1 routes; it does not authorize tools, approval, routing policy, or execution policy on its own.
+- Assumption: a loopback-only local model adapter is allowed before broader optional-provider expansion because it remains optional, null-adapter-safe, and strictly bounded to planner assistance for the first golden workflow.
+- Settings now exposes session-local planner provider/model selection, while Connections and the Command Center surface provider health and planner fallback state without making the planner mandatory for the base workflow.
+
+## Phase 6 Slice G Notes
+
+- Tasks & Projects now exposes typed per-run export and delete controls so persisted review state can be staged for export or removed without broadening routing or execution authority.
+- Run exports are sanitized and staged under encrypted-at-rest local storage before any later out-of-app export path is considered; no plaintext export cache is introduced in this slice.
+- Settings now shows the default retention TTLs plus sensitive-session defaults explicitly, which keeps local review-data posture inspectable while the proof gate is still open.

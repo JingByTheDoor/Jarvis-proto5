@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { routeTaskIntent } from "../../src/core/planning/task-routing";
+import {
+  routeTaskIntent,
+  shouldAttemptPlannerNormalization
+} from "../../src/core/planning/task-routing";
 
 describe("task routing", () => {
   it("classifies explicit guarded shell commands as CAUTION by default", () => {
@@ -37,5 +40,17 @@ describe("task routing", () => {
 
     expect(route.chosen_route).toBe("manual_confirmation_required");
     expect(route.risk_class).toBe("DANGER");
+  });
+
+  it("allows planner normalization for unsupported natural-language edits", () => {
+    expect(
+      shouldAttemptPlannerNormalization(
+        "Update the README heading to JARVIS and show me the exact diff first."
+      )
+    ).toBe(true);
+  });
+
+  it("does not ask the planner to down-route obviously dangerous intents", () => {
+    expect(shouldAttemptPlannerNormalization("Delete the repo and redeploy it")).toBe(false);
   });
 });

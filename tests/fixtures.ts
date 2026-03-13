@@ -6,8 +6,11 @@ import type {
   ExecutionAttestation,
   ExecutionManifest,
   MemoryRecord,
+  PlannerAssistance,
+  PlannerProviderStatus,
   Plan,
   PolicySnapshot,
+  RunExportBundle,
   RunEvent,
   RunLog,
   ToolResult,
@@ -16,11 +19,16 @@ import type {
 } from "../src/core/schemas";
 import type {
   ApprovalDecisionResponse,
+  PlannerSettingsUpdateRequest,
+  PlannerStatusResponse,
   ApprovalRequest,
   RecallSearchResponse,
+  RunDeleteResponse,
+  RunExportResponse,
   RunExecutionResponse,
   RunHistoryResponse,
   SimulationSummary,
+  WorkflowProofReportResponse,
   WorkflowProofSummaryResponse
 } from "../src/shared/ipc";
 
@@ -34,10 +42,51 @@ export const README_PATH = `${WORKSPACE_ROOT}\\README.md`;
 export const OUTPUT_PATH = `${WORKSPACE_ROOT}\\.tmp\\runs\\run-1.json`;
 
 export const validPolicySnapshot: PolicySnapshot = {
-  version: "phase-6-proof-gate",
+  version: "phase-6-planner-assist",
   workflow: "PLAN -> COMPILE -> SIMULATE -> APPROVAL -> EXECUTE -> ATTEST -> REVIEW",
   routing_mode: "local_first_stubbed",
   generated_at: ISO_NOW
+};
+
+export const validPlannerProviderStatus: PlannerProviderStatus = {
+  adapter_name: "planner.local_ollama",
+  provider_kind: "local_ollama",
+  configured: true,
+  reachable: true,
+  last_check_at: ISO_NOW,
+  mode: "active",
+  read_available: true,
+  write_available: true,
+  model_name: "qwen2.5:3b",
+  endpoint_url: "http://127.0.0.1:11434",
+  available_models: ["qwen2.5:3b", "qwen2.5:1.5b"],
+  notes: [
+    "Local Ollama is reachable and qwen2.5:3b is available for planner assistance."
+  ],
+  source: "session_override"
+};
+
+export const validPlannerSettingsUpdateRequest: PlannerSettingsUpdateRequest = {
+  provider_kind: "local_ollama",
+  model_name: "qwen2.5:3b",
+  endpoint_url: "http://127.0.0.1:11434"
+};
+
+export const validPlannerAssistance: PlannerAssistance = {
+  status: "normalized",
+  original_task: "Update the README heading to JARVIS and show me the exact diff first.",
+  normalized_task: 'replace "hello" with "hello jarvis" in README.md',
+  used_for_preview: true,
+  confidence: "high",
+  rationale:
+    "The request can be reduced to a single-file replace using the visible README context.",
+  route_hint: "local_repo_file_tools",
+  task_type_hint: "repo_edit",
+  notes: [
+    "Planner output was converted into a deterministic v1 task shape before compile.",
+    "Typed-tool precedence remains in force after planner normalization."
+  ],
+  provider_status: validPlannerProviderStatus
 };
 
 export const validAction: Action = {
@@ -283,6 +332,38 @@ export const validRunHistoryResponse: RunHistoryResponse = {
   runs: [validRunLog]
 };
 
+export const validRunExportBundle: RunExportBundle = {
+  version: 1,
+  run_id: validRunLog.run_id,
+  workspace_root: WORKSPACE_ROOT,
+  source_run_path: `${WORKSPACE_ROOT}\\.tmp\\runs\\${validRunLog.run_id}.json`,
+  exported_at: ISO_LATER,
+  redaction_count: 0,
+  placeholders: [],
+  note: "Sanitized run export staged under encrypted-at-rest local storage.",
+  run_log: validRunLog
+};
+
+export const validRunDeleteResponse: RunDeleteResponse = {
+  run_id: validRunLog.run_id,
+  deleted: true,
+  deleted_paths: [
+    `${WORKSPACE_ROOT}\\.tmp\\runs\\${validRunLog.run_id}.json`,
+    `${WORKSPACE_ROOT}\\.tmp\\exports\\${validRunLog.run_id}.json`
+  ],
+  message: `Deleted local review artifacts for ${validRunLog.run_id}.`
+};
+
+export const validRunExportResponse: RunExportResponse = {
+  run_id: validRunLog.run_id,
+  staged_export_path: `${WORKSPACE_ROOT}\\.tmp\\exports\\${validRunLog.run_id}.json`,
+  exported_at: ISO_LATER,
+  redaction_count: 0,
+  placeholders: [],
+  bundle: validRunExportBundle,
+  message: `Staged a sanitized encrypted export for ${validRunLog.run_id}.`
+};
+
 export const validRecallSearchResponse: RecallSearchResponse = {
   results: [
     {
@@ -486,6 +567,53 @@ export const validWorkflowProofSummaryResponse: WorkflowProofSummaryResponse = {
   recent_journeys: [validWorkflowProofRecord]
 };
 
+export const validWorkflowProofReportResponse: WorkflowProofReportResponse = {
+  workspace_root: WORKSPACE_ROOT,
+  generated_at: ISO_LATER,
+  summary: validWorkflowProofSummaryResponse.summary,
+  gate_status: validWorkflowProofSummaryResponse.gate_status,
+  recent_journeys: validWorkflowProofSummaryResponse.recent_journeys,
+  report_markdown: `# Workflow Proof Report
+- Generated at: ${ISO_LATER}
+- Workspace: ${WORKSPACE_ROOT}
+- Overall gate: collecting_evidence
+
+## Summary
+- Golden workflow review_ready: 1 / 1
+- Stability rate: 1
+- Cold start -> composer median: 500 ms
+- Task -> preview median: 1000 ms
+- Preview -> approval median: 2000 ms
+- Approval -> first result median: 2000 ms
+- Execute -> first result median: 1000 ms
+- Workflow steps median: 4
+- Operator clicks median: 4
+- Repeat task -> preview median: 1000 ms
+- Resumed journeys reaching review_ready: 1 / 1
+
+## Gate Criteria
+### Stability
+- Status: not_enough_data
+- Detail: Need at least 3 recent golden edit journeys before stability can be judged.
+- Window samples: 1 / 3
+- Review-ready in window: 1 / 3
+
+## Blocking Reasons
+- Need at least 3 recent golden edit journeys before stability can be judged.
+
+## Recent Journeys
+### journey-1
+- Kind: golden_edit_workflow
+- State: review_ready
+- Route: local_repo_file_tools
+- Resume used: yes
+- Steps / Clicks: 4 / 4
+- Updated at: ${ISO_LATER}
+
+## Assumption Note
+${validWorkflowProofGateStatus.assumption_note}`
+};
+
 export const validTaskIntentEnvelope = {
   channel: "task.intent.submit" as const,
   payload: {
@@ -524,6 +652,7 @@ export const validTaskIntentResponseEnvelope = {
     approval_requests: [],
     simulation_summary: validSimulationSummary,
     diff_previews: [],
+    planner_assistance: validPlannerAssistance,
     preview_generated_at: ISO_NOW
   }
 };
@@ -564,6 +693,32 @@ export const validRunHistoryResponseEnvelope = {
   payload: validRunHistoryResponse
 };
 
+export const validRunDeleteRequestEnvelope = {
+  channel: "run.delete.request" as const,
+  payload: {
+    workspace_root: WORKSPACE_ROOT,
+    run_id: validRunLog.run_id
+  }
+};
+
+export const validRunDeleteResponseEnvelope = {
+  channel: "run.delete.response" as const,
+  payload: validRunDeleteResponse
+};
+
+export const validRunExportRequestEnvelope = {
+  channel: "run.export.request" as const,
+  payload: {
+    workspace_root: WORKSPACE_ROOT,
+    run_id: validRunLog.run_id
+  }
+};
+
+export const validRunExportResponseEnvelope = {
+  channel: "run.export.response" as const,
+  payload: validRunExportResponse
+};
+
 export const validPolicySnapshotRequestEnvelope = {
   channel: "policy.snapshot.get" as const,
   payload: {
@@ -574,12 +729,47 @@ export const validPolicySnapshotRequestEnvelope = {
 export const validPolicySnapshotResponseEnvelope = {
   channel: "policy.snapshot.response" as const,
   payload: {
-    version: "phase-6-proof-gate",
+    version: "phase-6-planner-assist",
     workflow: validPolicySnapshot.workflow,
     local_first: true as const,
     approval_required_for_risky_actions: true as const,
-    app_started_at: ISO_APP_STARTED
+    app_started_at: ISO_APP_STARTED,
+    retention_policy: {
+      run_history_days: 30,
+      event_logs_days: 7,
+      cache_days: 3,
+      sensitive_session_cache_hours: 24,
+      export_staging_encrypted_at_rest: true as const
+    },
+    sensitive_session_defaults: {
+      reduced_logging: true as const,
+      tier2_memory_writes_enabled: false as const,
+      tier3_analytics_writes_enabled: false as const,
+      minimal_summaries_only: true as const
+    }
   }
+};
+
+export const validPlannerStatusResponseEnvelope = {
+  channel: "planner.status.response" as const,
+  payload: validPlannerProviderStatus satisfies PlannerStatusResponse
+};
+
+export const validPlannerStatusRequestEnvelope = {
+  channel: "planner.status.get" as const,
+  payload: {
+    session_id: "session-1"
+  }
+};
+
+export const validPlannerSettingsUpdateRequestEnvelope = {
+  channel: "planner.settings.update" as const,
+  payload: validPlannerSettingsUpdateRequest
+};
+
+export const validPlannerSettingsUpdateResponseEnvelope = {
+  channel: "planner.settings.response" as const,
+  payload: validPlannerProviderStatus satisfies PlannerStatusResponse
 };
 
 export const validRecallSearchRequestEnvelope = {
@@ -612,6 +802,19 @@ export const validWorkflowProofSummaryRequestEnvelope = {
 export const validWorkflowProofSummaryResponseEnvelope = {
   channel: "workflow.proof.summary.response" as const,
   payload: validWorkflowProofSummaryResponse
+};
+
+export const validWorkflowProofReportRequestEnvelope = {
+  channel: "workflow.proof.report.get" as const,
+  payload: {
+    workspace_root: WORKSPACE_ROOT,
+    limit: 5
+  }
+};
+
+export const validWorkflowProofReportResponseEnvelope = {
+  channel: "workflow.proof.report.response" as const,
+  payload: validWorkflowProofReportResponse
 };
 
 export const validRunEventEnvelope = {

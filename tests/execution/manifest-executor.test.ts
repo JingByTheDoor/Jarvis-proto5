@@ -7,7 +7,11 @@ import { InMemoryApprovalRegistry } from "../../src/core/approval/approval-regis
 import { InMemoryCapabilityTokenStore } from "../../src/core/capabilities/capability-token-store";
 import { createTaskPreview } from "../../src/core/compile/task-preview";
 import { ManifestExecutionRuntime } from "../../src/core/execution/manifest-executor";
-import type { RunLogStore } from "../../src/core/events/run-log-store";
+import type {
+  RunLogDeleteResult,
+  RunLogExportResult,
+  RunLogStore
+} from "../../src/core/events/run-log-store";
 import type { RunLog, RunEvent } from "../../src/core/schemas";
 import { ISO_NOW } from "../fixtures";
 import { createTempRepo } from "../support/temp-repo";
@@ -23,6 +27,47 @@ class MemoryRunLogStore implements RunLogStore {
   listRunLogs(_workspaceRoot: string, limit: number): RunLog[] {
     return this.runLogs.slice(0, limit);
   }
+
+  deleteRunLog(_workspaceRoot: string, runId: string): RunLogDeleteResult {
+    return {
+      run_id: runId,
+      deleted: false,
+      deleted_paths: []
+    };
+  }
+
+  stageRunExport(_workspaceRoot: string, runId: string, exportedAt: string): RunLogExportResult {
+    return {
+      run_id: runId,
+      staged_export_path: `D:\\unused\\${runId}.json`,
+      bundle: {
+        version: 1,
+        run_id: runId,
+        workspace_root: "D:\\unused",
+        source_run_path: `D:\\unused\\${runId}.json`,
+        exported_at: exportedAt,
+        redaction_count: 0,
+        placeholders: [],
+        note: "Not used in manifest execution tests.",
+        run_log: this.runLogs[0] ?? {
+          run_id: runId,
+          plan_id: "plan-unused",
+          manifest_id: "manifest-unused",
+          manifest_hash: "manifest-unused",
+          events: [],
+          attestations: [],
+          final_result: {
+            status: "failed",
+            summary: "Not used in manifest execution tests."
+          },
+          artifacts: [],
+          started_at: ISO_NOW,
+          finished_at: ISO_NOW,
+          persistence_status: "execution_complete"
+        }
+      }
+    };
+  }
 }
 
 class ThrowingRunLogStore implements RunLogStore {
@@ -33,10 +78,51 @@ class ThrowingRunLogStore implements RunLogStore {
   listRunLogs(): RunLog[] {
     return [];
   }
+
+  deleteRunLog(_workspaceRoot: string, runId: string): RunLogDeleteResult {
+    return {
+      run_id: runId,
+      deleted: false,
+      deleted_paths: []
+    };
+  }
+
+  stageRunExport(_workspaceRoot: string, runId: string, exportedAt: string): RunLogExportResult {
+    return {
+      run_id: runId,
+      staged_export_path: `D:\\unused\\${runId}.json`,
+      bundle: {
+        version: 1,
+        run_id: runId,
+        workspace_root: "D:\\unused",
+        source_run_path: `D:\\unused\\${runId}.json`,
+        exported_at: exportedAt,
+        redaction_count: 0,
+        placeholders: [],
+        note: "Not used in manifest execution tests.",
+        run_log: {
+          run_id: runId,
+          plan_id: "plan-unused",
+          manifest_id: "manifest-unused",
+          manifest_hash: "manifest-unused",
+          events: [],
+          attestations: [],
+          final_result: {
+            status: "failed",
+            summary: "Not used in manifest execution tests."
+          },
+          artifacts: [],
+          started_at: ISO_NOW,
+          finished_at: ISO_NOW,
+          persistence_status: "execution_complete"
+        }
+      }
+    };
+  }
 }
 
 describe("manifest execution runtime", () => {
-  it("executes an approved typed manifest, emits structured events, and records attestations", () => {
+  it("executes an approved typed manifest, emits structured events, and records attestations", async () => {
     const repo = createTempRepo({
       "package.json": JSON.stringify({ name: "phase-4-fixture", version: "1.0.0" }, null, 2),
       "docs/notes.txt": "hello world\n"
@@ -55,7 +141,7 @@ describe("manifest execution runtime", () => {
     });
 
     try {
-      const previewResponse = createTaskPreview({
+      const previewResponse = await createTaskPreview({
         task: 'replace "world" with "JARVIS" in docs/notes.txt',
         session_id: "phase-4-execution",
         workspace_roots: [repo.root],
@@ -104,7 +190,7 @@ describe("manifest execution runtime", () => {
     }
   });
 
-  it("fails safely before the non-trivial write when no valid approval is available", () => {
+  it("fails safely before the non-trivial write when no valid approval is available", async () => {
     const repo = createTempRepo({
       "package.json": JSON.stringify({ name: "phase-4-fixture", version: "1.0.0" }, null, 2),
       "docs/notes.txt": "hello world\n"
@@ -119,7 +205,7 @@ describe("manifest execution runtime", () => {
     });
 
     try {
-      const previewResponse = createTaskPreview({
+      const previewResponse = await createTaskPreview({
         task: 'replace "world" with "JARVIS" in docs/notes.txt',
         session_id: "phase-4-execution",
         workspace_roots: [repo.root],
@@ -146,7 +232,7 @@ describe("manifest execution runtime", () => {
     }
   });
 
-  it("keeps execution visible when run-log persistence fails after attestation", () => {
+  it("keeps execution visible when run-log persistence fails after attestation", async () => {
     const repo = createTempRepo({
       "package.json": JSON.stringify({ name: "phase-4-fixture", version: "1.0.0" }, null, 2),
       "docs/notes.txt": "hello world\n"
@@ -164,7 +250,7 @@ describe("manifest execution runtime", () => {
     });
 
     try {
-      const previewResponse = createTaskPreview({
+      const previewResponse = await createTaskPreview({
         task: 'replace "world" with "JARVIS" in docs/notes.txt',
         session_id: "phase-4-execution",
         workspace_roots: [repo.root],

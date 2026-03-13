@@ -3,6 +3,13 @@ import type { RecallEntry } from "../../shared/ipc";
 
 export interface TasksProjectsPageProps {
   readonly runHistory: readonly RunLog[];
+  readonly runHistoryActionMessage: string | null;
+  readonly pendingRunAction: {
+    runId: string;
+    kind: "delete" | "export";
+  } | null;
+  readonly onDeleteRun: (runId: string) => void;
+  readonly onExportRun: (runId: string) => void;
   readonly recallQuery: string;
   readonly onRecallQueryChange: (nextValue: string) => void;
   readonly onRecallSearch: () => void;
@@ -15,6 +22,10 @@ export interface TasksProjectsPageProps {
 export function TasksProjectsPage(props: TasksProjectsPageProps) {
   const {
     runHistory,
+    runHistoryActionMessage,
+    pendingRunAction,
+    onDeleteRun,
+    onExportRun,
     recallQuery,
     onRecallQueryChange,
     onRecallSearch,
@@ -67,6 +78,12 @@ export function TasksProjectsPage(props: TasksProjectsPageProps) {
         </article>
       </div>
       <div className="summary-grid">
+        {runHistoryActionMessage ? (
+          <article className="summary-card summary-card-wide">
+            <h3>Run controls</h3>
+            <p>{runHistoryActionMessage}</p>
+          </article>
+        ) : null}
         {runHistory.length > 0 ? (
           runHistory.map((run) => (
             <article className="summary-card" key={run.run_id}>
@@ -77,6 +94,36 @@ export function TasksProjectsPage(props: TasksProjectsPageProps) {
               <p>Artifacts: {run.artifacts.length}</p>
               <p>Persistence: {run.persistence_status}</p>
               <p>{run.final_result.summary}</p>
+              <div className="action-row">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => onExportRun(run.run_id)}
+                  disabled={
+                    pendingRunAction?.runId === run.run_id &&
+                    pendingRunAction.kind === "export"
+                  }
+                >
+                  {pendingRunAction?.runId === run.run_id &&
+                  pendingRunAction.kind === "export"
+                    ? "Exporting..."
+                    : "Export run"}
+                </button>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => onDeleteRun(run.run_id)}
+                  disabled={
+                    pendingRunAction?.runId === run.run_id &&
+                    pendingRunAction.kind === "delete"
+                  }
+                >
+                  {pendingRunAction?.runId === run.run_id &&
+                  pendingRunAction.kind === "delete"
+                    ? "Deleting..."
+                    : "Delete run"}
+                </button>
+              </div>
             </article>
           ))
         ) : (

@@ -9,13 +9,16 @@ import {
 } from "../persistence/encrypted-at-rest";
 import {
   WorkflowProofGateStatusSchema,
+  WorkflowProofReportSchema,
   WorkflowProofRecordSchema,
   WorkflowProofSummarySchema,
   type WorkflowProofGateStatus,
+  type WorkflowProofReport,
   type WorkflowProofRecord,
   type WorkflowProofSummary
 } from "../schemas";
 import { evaluateWorkflowProofGate } from "./proof-gate-evaluator";
+import { createWorkflowProofReport } from "./workflow-proof-report";
 
 const WorkflowProofStoreEnvelopeSchema = z
   .object({
@@ -41,6 +44,11 @@ export interface WorkflowProofStore {
     workspaceRoot: string,
     limit: number
   ) => WorkflowProofSummarySnapshot;
+  readonly getReport: (
+    workspaceRoot: string,
+    limit: number,
+    generatedAt: string
+  ) => WorkflowProofReport;
 }
 
 function getWorkflowProofPath(workspaceRoot: string): string {
@@ -144,6 +152,19 @@ function summarizeWorkflowProofRecords(
   });
 }
 
+function createSummarySnapshot(
+  orderedRecords: readonly WorkflowProofRecord[],
+  limit: number
+): WorkflowProofSummarySnapshot {
+  return {
+    summary: summarizeWorkflowProofRecords(orderedRecords),
+    gate_status: WorkflowProofGateStatusSchema.parse(
+      evaluateWorkflowProofGate(orderedRecords)
+    ),
+    recent_journeys: orderedRecords.slice(0, limit)
+  };
+}
+
 export class EncryptedWorkflowProofStore implements WorkflowProofStore {
   public constructor(
     private readonly encryptedAtRestProvider: EncryptedAtRestProvider = new DefaultEncryptedAtRestProvider()
@@ -176,13 +197,29 @@ export class EncryptedWorkflowProofStore implements WorkflowProofStore {
       right.updated_at.localeCompare(left.updated_at)
     );
 
-    return {
-      summary: summarizeWorkflowProofRecords(orderedRecords),
-      gate_status: WorkflowProofGateStatusSchema.parse(
-        evaluateWorkflowProofGate(orderedRecords)
-      ),
-      recent_journeys: orderedRecords.slice(0, limit)
-    };
+    return createSummarySnapshot(orderedRecords, limit);
+  }
+
+  public getReport(
+    workspaceRoot: string,
+    limit: number,
+    generatedAt: string
+  ): WorkflowProofReport {
+    const envelope = this.readEnvelope(workspaceRoot);
+    const orderedRecords = [...envelope.records].sort((left, right) =>
+      right.updated_at.localeCompare(left.updated_at)
+    );
+    const snapshot = createSummarySnapshot(orderedRecords, limit);
+
+    return WorkflowProofReportSchema.parse(
+      createWorkflowProofReport({
+        workspace_root: workspaceRoot,
+        generated_at: generatedAt,
+        summary: snapshot.summary,
+        gate_status: snapshot.gate_status,
+        recent_journeys: snapshot.recent_journeys
+      })
+    );
   }
 
   private readEnvelope(workspaceRoot: string): WorkflowProofStoreEnvelope {

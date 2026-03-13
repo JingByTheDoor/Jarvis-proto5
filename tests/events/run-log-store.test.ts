@@ -66,4 +66,55 @@ describe("run log store", () => {
       repo.cleanup();
     }
   });
+
+  it("deletes persisted run logs and any staged export for the same run id", () => {
+    const repo = createTempRepo({
+      "package.json": JSON.stringify({ name: "phase-6-delete", version: "1.0.0" }, null, 2)
+    });
+
+    try {
+      const runLogStore = new EncryptedRunLogStore(new TestEncryptedAtRestProvider());
+      runLogStore.writeRunLog(repo.root, validRunLog);
+      runLogStore.stageRunExport(repo.root, validRunLog.run_id, validRunLog.finished_at);
+
+      const deleteResult = runLogStore.deleteRunLog(repo.root, validRunLog.run_id);
+
+      expect(deleteResult.deleted).toBe(true);
+      expect(deleteResult.deleted_paths).toHaveLength(2);
+      expect(runLogStore.listRunLogs(repo.root, 10)).toEqual([]);
+    } finally {
+      repo.cleanup();
+    }
+  });
+
+  it("stages a sanitized encrypted export bundle under .tmp/exports", () => {
+    const repo = createTempRepo({
+      "package.json": JSON.stringify({ name: "phase-6-export", version: "1.0.0" }, null, 2)
+    });
+
+    try {
+      const runLogStore = new EncryptedRunLogStore(new TestEncryptedAtRestProvider());
+      runLogStore.writeRunLog(repo.root, {
+        ...validRunLog,
+        final_result: {
+          ...validRunLog.final_result,
+          summary: "Cookie: session=sk-ABCDEFGH12345678"
+        }
+      });
+
+      const exportResult = runLogStore.stageRunExport(
+        repo.root,
+        validRunLog.run_id,
+        validRunLog.finished_at
+      );
+
+      expect(exportResult.staged_export_path).toContain(".tmp");
+      expect(exportResult.staged_export_path).toContain("exports");
+      expect(exportResult.bundle.run_log.final_result.summary).toContain("[REDACTED:");
+      expect(exportResult.bundle.redaction_count).toBeGreaterThan(0);
+      expect(exportResult.bundle.note).toContain("encrypted-at-rest");
+    } finally {
+      repo.cleanup();
+    }
+  });
 });

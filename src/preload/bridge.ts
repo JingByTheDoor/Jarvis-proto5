@@ -5,16 +5,26 @@ import {
 } from "../core/schemas";
 import {
   ApprovalDecisionResponseSchema,
+  PlannerSettingsUpdateRequestSchema,
+  PlannerSettingsUpdateResponseSchema,
+  PlannerStatusRequestSchema,
+  PlannerStatusResponseSchema,
   PolicySnapshotRequestSchema,
   PolicySnapshotResponseSchema,
   RecallSearchRequestSchema,
   RecallSearchResponseSchema,
+  RunDeleteRequestSchema,
+  RunDeleteResponseSchema,
+  RunExportRequestSchema,
+  RunExportResponseSchema,
   RunExecutionRequestSchema,
   RunExecutionResponseSchema,
   RunHistoryRequestSchema,
   RunHistoryResponseSchema,
   TaskIntentRequestSchema,
   TaskIntentResponseSchema,
+  WorkflowProofReportRequestSchema,
+  WorkflowProofReportResponseSchema,
   WorkflowProofSummaryRequestSchema,
   WorkflowProofSummaryResponseSchema
 } from "../shared/ipc";
@@ -55,6 +65,16 @@ export function createJarvisDesktopApi(ipcRenderer: IpcRendererLike): JarvisDesk
       const response = await ipcRenderer.invoke("run.history.list", parsedPayload);
       return RunHistoryResponseSchema.parse(response);
     },
+    async deleteRunHistoryEntry(payload) {
+      const parsedPayload = RunDeleteRequestSchema.parse(payload);
+      const response = await ipcRenderer.invoke("run.delete.request", parsedPayload);
+      return RunDeleteResponseSchema.parse(response);
+    },
+    async exportRunHistoryEntry(payload) {
+      const parsedPayload = RunExportRequestSchema.parse(payload);
+      const response = await ipcRenderer.invoke("run.export.request", parsedPayload);
+      return RunExportResponseSchema.parse(response);
+    },
     async searchLocalRecall(payload) {
       const parsedPayload = RecallSearchRequestSchema.parse(payload);
       const response = await ipcRenderer.invoke("recall.search.query", parsedPayload);
@@ -70,10 +90,25 @@ export function createJarvisDesktopApi(ipcRenderer: IpcRendererLike): JarvisDesk
       const response = await ipcRenderer.invoke("workflow.proof.summary.get", parsedPayload);
       return WorkflowProofSummaryResponseSchema.parse(response);
     },
+    async getWorkflowProofReport(payload) {
+      const parsedPayload = WorkflowProofReportRequestSchema.parse(payload);
+      const response = await ipcRenderer.invoke("workflow.proof.report.get", parsedPayload);
+      return WorkflowProofReportResponseSchema.parse(response);
+    },
     async getPolicySnapshot(payload) {
       const parsedPayload = PolicySnapshotRequestSchema.parse(payload);
       const response = await ipcRenderer.invoke("policy.snapshot.get", parsedPayload);
       return PolicySnapshotResponseSchema.parse(response);
+    },
+    async getPlannerStatus(payload) {
+      const parsedPayload = PlannerStatusRequestSchema.parse(payload);
+      const response = await ipcRenderer.invoke("planner.status.get", parsedPayload);
+      return PlannerStatusResponseSchema.parse(response);
+    },
+    async updatePlannerSettings(payload) {
+      const parsedPayload = PlannerSettingsUpdateRequestSchema.parse(payload);
+      const response = await ipcRenderer.invoke("planner.settings.update", parsedPayload);
+      return PlannerSettingsUpdateResponseSchema.parse(response);
     },
     subscribeToRunEvents(listener) {
       const wrappedListener = (_event: unknown, payload: unknown) => {

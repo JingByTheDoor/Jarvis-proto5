@@ -10,10 +10,13 @@ import type { RunEvent, RunLog, WorkflowProofRecord } from "../core/schemas";
 import type {
   ApprovalDecisionResponse,
   ApprovalRequest,
+  PlannerSettingsUpdateRequest,
+  PlannerStatusResponse,
   PolicySnapshotResponse,
   RecallEntry,
   RunExecutionResponse,
   TaskIntentResponse,
+  WorkflowProofReportResponse,
   WorkflowProofSummaryResponse
 } from "../shared/ipc";
 import type {
@@ -40,6 +43,8 @@ interface PageNavigationItem {
   readonly label: string;
   readonly summary: string;
 }
+
+type RunActionKind = "delete" | "export";
 
 const pageNavigationItems: readonly PageNavigationItem[] = [
   {
@@ -71,6 +76,11 @@ const pageNavigationItems: readonly PageNavigationItem[] = [
 
 const SESSION_ID = "phase-6-proof-gate";
 const WORKSPACE_ROOT = "D:\\Jarvis-proto5 repo\\Jarvis-proto5";
+const DEFAULT_PLANNER_DRAFT: PlannerSettingsUpdateRequest = {
+  provider_kind: "local_ollama",
+  model_name: "qwen2.5:3b",
+  endpoint_url: "http://127.0.0.1:11434"
+};
 
 function selectApprovalScopeClass(
   approvalRequest: ApprovalRequest,
@@ -230,6 +240,11 @@ export function JarvisApp() {
   );
   const [policySnapshot, setPolicySnapshot] = useState<PolicySnapshotResponse | null>(null);
   const [policyError, setPolicyError] = useState<string | null>(null);
+  const [plannerStatus, setPlannerStatus] = useState<PlannerStatusResponse | null>(null);
+  const [plannerError, setPlannerError] = useState<string | null>(null);
+  const [plannerDraft, setPlannerDraft] =
+    useState<PlannerSettingsUpdateRequest>(DEFAULT_PLANNER_DRAFT);
+  const [plannerSaveMessage, setPlannerSaveMessage] = useState<string | null>(null);
   const [lastIntentResponse, setLastIntentResponse] = useState<TaskIntentResponse | null>(null);
   const [approvalReceipts, setApprovalReceipts] = useState<
     Record<string, ApprovalDecisionResponse>
@@ -240,12 +255,19 @@ export function JarvisApp() {
     useState<RunExecutionResponse | null>(null);
   const [runEvents, setRunEvents] = useState<RunEvent[]>([]);
   const [runHistory, setRunHistory] = useState<RunLog[]>([]);
+  const [runHistoryActionMessage, setRunHistoryActionMessage] = useState<string | null>(null);
+  const [pendingRunAction, setPendingRunAction] = useState<{
+    runId: string;
+    kind: RunActionKind;
+  } | null>(null);
   const [recallQuery, setRecallQuery] = useState("");
   const [recallResults, setRecallResults] = useState<RecallEntry[]>([]);
   const [recallError, setRecallError] = useState<string | null>(null);
   const [isRecallSearching, setIsRecallSearching] = useState(false);
   const [proofSummary, setProofSummary] = useState<WorkflowProofSummaryResponse | null>(null);
   const [proofError, setProofError] = useState<string | null>(null);
+  const [proofReport, setProofReport] = useState<WorkflowProofReportResponse | null>(null);
+  const [proofReportError, setProofReportError] = useState<string | null>(null);
   const [currentWorkflowJourney, setCurrentWorkflowJourney] =
     useState<WorkflowProofRecord | null>(null);
   const [pendingResumeRecallId, setPendingResumeRecallId] = useState<string | null>(null);
@@ -286,13 +308,60 @@ export function JarvisApp() {
     }
   }
 
+  async function refreshWorkflowProofReport(): Promise<void> {
+    try {
+      const response = await desktopApi.getWorkflowProofReport({
+        workspace_root: WORKSPACE_ROOT,
+        limit: 6
+      });
+      setProofReport(response);
+      setProofReportError(null);
+    } catch (error) {
+      setProofReportError(
+        error instanceof Error ? error.message : "Failed to load the workflow proof report."
+      );
+    }
+  }
+
+  function syncPlannerDraftFromStatus(status: PlannerStatusResponse): void {
+    setPlannerDraft({
+      provider_kind: status.provider_kind,
+      model_name:
+        status.provider_kind === "null_adapter"
+          ? null
+          : status.model_name ?? DEFAULT_PLANNER_DRAFT.model_name,
+      endpoint_url:
+        status.provider_kind === "null_adapter"
+          ? null
+          : status.endpoint_url ?? DEFAULT_PLANNER_DRAFT.endpoint_url
+    });
+  }
+
+  async function refreshPlannerStatus(): Promise<void> {
+    try {
+      const response = await desktopApi.getPlannerStatus({
+        session_id: SESSION_ID
+      });
+      setPlannerStatus(response);
+      syncPlannerDraftFromStatus(response);
+      setPlannerError(null);
+    } catch (error) {
+      setPlannerError(
+        error instanceof Error ? error.message : "Failed to load planner provider status."
+      );
+    }
+  }
+
   function persistWorkflowJourney(nextRecord: WorkflowProofRecord): void {
     workflowJourneyRef.current = nextRecord;
     setCurrentWorkflowJourney(nextRecord);
 
     void desktopApi
       .recordWorkflowProof(nextRecord)
-      .then(() => refreshWorkflowProofSummary())
+      .then(async () => {
+        await refreshWorkflowProofSummary();
+        await refreshWorkflowProofReport();
+      })
       .catch((error: unknown) => {
         setProofError(
           error instanceof Error ? error.message : "Failed to persist the workflow proof record."
@@ -315,6 +384,69 @@ export function JarvisApp() {
       setRecallError(error instanceof Error ? error.message : "Failed to search local recall.");
     } finally {
       setIsRecallSearching(false);
+    }
+  }
+
+  async function handlePlannerSettingsApply(): Promise<void> {
+    try {
+      const response = await desktopApi.updatePlannerSettings(plannerDraft);
+      setPlannerStatus(response);
+      syncPlannerDraftFromStatus(response);
+      setPlannerSaveMessage(
+        `Applied ${response.provider_kind} / ${response.model_name ?? "no model"} for this session.`
+      );
+      setPlannerError(null);
+    } catch (error) {
+      setPlannerSaveMessage(null);
+      setPlannerError(
+        error instanceof Error ? error.message : "Failed to update planner settings."
+      );
+    }
+  }
+
+  async function handleDeleteRun(runId: string): Promise<void> {
+    setPendingRunAction({
+      runId,
+      kind: "delete"
+    });
+
+    try {
+      const response = await desktopApi.deleteRunHistoryEntry({
+        workspace_root: WORKSPACE_ROOT,
+        run_id: runId
+      });
+      setRunHistoryActionMessage(response.message);
+      await refreshRunHistory();
+      await handleRecallSearch(recallQuery);
+    } catch (error) {
+      setRunHistoryActionMessage(
+        error instanceof Error ? error.message : `Failed to delete ${runId}.`
+      );
+    } finally {
+      setPendingRunAction(null);
+    }
+  }
+
+  async function handleExportRun(runId: string): Promise<void> {
+    setPendingRunAction({
+      runId,
+      kind: "export"
+    });
+
+    try {
+      const response = await desktopApi.exportRunHistoryEntry({
+        workspace_root: WORKSPACE_ROOT,
+        run_id: runId
+      });
+      setRunHistoryActionMessage(
+        `${response.message} Staged at ${response.staged_export_path} with ${response.redaction_count} redaction(s).`
+      );
+    } catch (error) {
+      setRunHistoryActionMessage(
+        error instanceof Error ? error.message : `Failed to stage an export for ${runId}.`
+      );
+    } finally {
+      setPendingRunAction(null);
     }
   }
 
@@ -359,6 +491,8 @@ export function JarvisApp() {
     void refreshRunHistory().catch(() => {});
     void handleRecallSearch("").catch(() => {});
     void refreshWorkflowProofSummary().catch(() => {});
+    void refreshWorkflowProofReport().catch(() => {});
+    void refreshPlannerStatus().catch(() => {});
 
     return () => {
       cancelled = true;
@@ -395,6 +529,9 @@ export function JarvisApp() {
     });
 
     setLastIntentResponse(response);
+    setPlannerStatus(response.planner_assistance.provider_status);
+    syncPlannerDraftFromStatus(response.planner_assistance.provider_status);
+    setPlannerError(null);
     setPendingResumeRecallId(null);
 
     const previewReadyAt = new Date().toISOString();
@@ -532,6 +669,14 @@ export function JarvisApp() {
         return (
           <TasksProjectsPage
             runHistory={runHistory}
+            runHistoryActionMessage={runHistoryActionMessage}
+            pendingRunAction={pendingRunAction}
+            onDeleteRun={(runId) => {
+              void handleDeleteRun(runId);
+            }}
+            onExportRun={(runId) => {
+              void handleExportRun(runId);
+            }}
             recallQuery={recallQuery}
             onRecallQueryChange={setRecallQuery}
             onRecallSearch={() => {
@@ -557,12 +702,35 @@ export function JarvisApp() {
           />
         );
       case "connections":
-        return <ConnectionsPage />;
+        return (
+          <ConnectionsPage
+            plannerStatus={plannerStatus}
+            plannerError={plannerError}
+          />
+        );
       case "settings":
         return (
           <SettingsPage
+            policySnapshot={policySnapshot}
+            policyError={policyError}
             proofSummary={proofSummary}
             proofError={proofError}
+            proofReport={proofReport}
+            proofReportError={proofReportError}
+            plannerStatus={plannerStatus}
+            plannerError={plannerError}
+            plannerDraft={plannerDraft}
+            plannerSaveMessage={plannerSaveMessage}
+            onPlannerDraftChange={(patch) => {
+              setPlannerDraft((currentDraft) => ({
+                ...currentDraft,
+                ...patch
+              }));
+              setPlannerSaveMessage(null);
+            }}
+            onPlannerSettingsApply={() => {
+              void handlePlannerSettingsApply();
+            }}
           />
         );
       case "command_center":
@@ -588,6 +756,7 @@ export function JarvisApp() {
             executionResponse={lastExecutionResponse}
             runEvents={runEvents}
             lastIntentResponse={lastIntentResponse}
+            plannerStatus={plannerStatus}
           />
         );
     }
@@ -619,7 +788,7 @@ export function JarvisApp() {
         <header className="top-bar">
           <div>
             <p className="eyebrow">Phase 6</p>
-            <h2>Proof gate before broader routing</h2>
+            <h2>Proof gate with local planner assist</h2>
           </div>
           <div className="status-cluster">
             <span className="status-pill">
@@ -648,7 +817,7 @@ export function JarvisApp() {
             <strong>Policy</strong>
             <span>
               {policyError ??
-                "Advanced routing and optional systems stay deferred until the golden workflow is measurably stable, low-friction, and locally proven."}
+                "Advanced routing and optional systems stay deferred; local planner assist may help task intake, but deterministic compile, simulation, approval, execution, attestation, and review still stay authoritative."}
             </span>
           </div>
         </section>
@@ -672,7 +841,7 @@ export function JarvisApp() {
                 </article>
                 <article className="rail-card">
                   <h3>Memory &amp; Provider Snapshot</h3>
-                  <p>Proof-gate metrics land first; durable memory and optional providers stay deferred behind the measured gate.</p>
+                  <p>Local planner provider health is visible now; durable memory and broader optional providers stay deferred behind the measured gate.</p>
                 </article>
                 <article className="rail-card">
                   <h3>Quick Actions</h3>

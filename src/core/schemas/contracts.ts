@@ -1,9 +1,8 @@
-import path from "node:path";
-
 import { z } from "zod";
 
 import {
   actionStatuses,
+  adapterModes,
   approvalDecisionKinds,
   approvalScopeClasses,
   contradictionStatuses,
@@ -14,6 +13,9 @@ import {
   networkAccessClasses,
   networkMethodFamilies,
   networkSchemes,
+  plannerAssistanceStatuses,
+  plannerPreferenceSources,
+  plannerProviderKinds,
   persistenceStatuses,
   previewConfidenceLevels,
   proofGateCriterionStatuses,
@@ -32,13 +34,20 @@ import {
 const IdentifierSchema = z.string().min(1);
 const NonEmptyStringSchema = z.string().min(1);
 const IsoDateTimeSchema = z.string().datetime({ offset: true });
+
+function isAbsolutePath(value: string): boolean {
+  return (
+    value.startsWith("/") ||
+    /^[A-Za-z]:[\\/]/.test(value) ||
+    value.startsWith("\\\\") ||
+    value.startsWith("//")
+  );
+}
+
 const AbsolutePathSchema = z
   .string()
   .min(1)
-  .refine(
-    (value) => path.win32.isAbsolute(value) || path.posix.isAbsolute(value),
-    "Expected an absolute path"
-  );
+  .refine((value) => isAbsolutePath(value), "Expected an absolute path");
 
 export const RiskLevelSchema = z.enum(riskLevels);
 export const WorkflowStateSchema = z.enum(workflowStates);
@@ -61,6 +70,10 @@ export const NetworkAccessClassSchema = z.enum(networkAccessClasses);
 export const RouteKindSchema = z.enum(routeKinds);
 export const TaskTypeSchema = z.enum(taskTypes);
 export const WorkflowJourneyKindSchema = z.enum(workflowJourneyKinds);
+export const AdapterModeSchema = z.enum(adapterModes);
+export const PlannerProviderKindSchema = z.enum(plannerProviderKinds);
+export const PlannerPreferenceSourceSchema = z.enum(plannerPreferenceSources);
+export const PlannerAssistanceStatusSchema = z.enum(plannerAssistanceStatuses);
 export const ProofGateCriterionStatusSchema = z.enum(proofGateCriterionStatuses);
 export const ProofGateOverallStatusSchema = z.enum(proofGateOverallStatuses);
 
@@ -307,6 +320,48 @@ export const MemoryRecordSchema = z
   })
   .strict();
 
+export const PlannerProviderStatusSchema = z
+  .object({
+    adapter_name: z.string().min(1),
+    provider_kind: PlannerProviderKindSchema,
+    configured: z.boolean(),
+    reachable: z.boolean(),
+    last_check_at: IsoDateTimeSchema.nullable(),
+    mode: AdapterModeSchema,
+    read_available: z.boolean(),
+    write_available: z.boolean(),
+    model_name: z.string().min(1).nullable(),
+    endpoint_url: z.string().url().nullable(),
+    available_models: z.array(z.string().min(1)),
+    notes: z.array(z.string()),
+    source: PlannerPreferenceSourceSchema
+  })
+  .strict();
+
+export const PlannerProviderConfigSchema = z
+  .object({
+    provider_kind: PlannerProviderKindSchema,
+    model_name: z.string().min(1).nullable(),
+    endpoint_url: z.string().url().nullable(),
+    source: PlannerPreferenceSourceSchema
+  })
+  .strict();
+
+export const PlannerAssistanceSchema = z
+  .object({
+    status: PlannerAssistanceStatusSchema,
+    original_task: NonEmptyStringSchema,
+    normalized_task: NonEmptyStringSchema,
+    used_for_preview: z.boolean(),
+    confidence: PreviewConfidenceSchema.nullable(),
+    rationale: z.string().min(1),
+    route_hint: RouteKindSchema.nullable(),
+    task_type_hint: TaskTypeSchema.nullable(),
+    notes: z.array(z.string()),
+    provider_status: PlannerProviderStatusSchema
+  })
+  .strict();
+
 export const WorkflowProofRecordSchema = z
   .object({
     journey_id: IdentifierSchema,
@@ -388,6 +443,31 @@ export const WorkflowProofGateStatusSchema = z
   })
   .strict();
 
+export const WorkflowProofReportSchema = z
+  .object({
+    workspace_root: AbsolutePathSchema,
+    generated_at: IsoDateTimeSchema,
+    summary: WorkflowProofSummarySchema,
+    gate_status: WorkflowProofGateStatusSchema,
+    recent_journeys: z.array(WorkflowProofRecordSchema),
+    report_markdown: z.string().min(1)
+  })
+  .strict();
+
+export const RunExportBundleSchema = z
+  .object({
+    version: z.literal(1),
+    run_id: IdentifierSchema,
+    workspace_root: AbsolutePathSchema,
+    source_run_path: AbsolutePathSchema,
+    exported_at: IsoDateTimeSchema,
+    redaction_count: z.number().int().min(0),
+    placeholders: z.array(z.string().min(1)),
+    note: z.string().min(1),
+    run_log: RunLogSchema
+  })
+  .strict();
+
 export type NetworkScopeRule = z.infer<typeof NetworkScopeRuleSchema>;
 export type NetworkScope = z.infer<typeof NetworkScopeSchema>;
 export type WorkspaceScope = z.infer<typeof WorkspaceScopeSchema>;
@@ -407,6 +487,11 @@ export type ExecutionAttestation = z.infer<typeof ExecutionAttestationSchema>;
 export type RunLog = z.infer<typeof RunLogSchema>;
 export type MemoryMetadata = z.infer<typeof MemoryMetadataSchema>;
 export type MemoryRecord = z.infer<typeof MemoryRecordSchema>;
+export type PlannerProviderStatus = z.infer<typeof PlannerProviderStatusSchema>;
+export type PlannerProviderConfig = z.infer<typeof PlannerProviderConfigSchema>;
+export type PlannerAssistance = z.infer<typeof PlannerAssistanceSchema>;
 export type WorkflowProofRecord = z.infer<typeof WorkflowProofRecordSchema>;
 export type WorkflowProofSummary = z.infer<typeof WorkflowProofSummarySchema>;
 export type WorkflowProofGateStatus = z.infer<typeof WorkflowProofGateStatusSchema>;
+export type WorkflowProofReport = z.infer<typeof WorkflowProofReportSchema>;
+export type RunExportBundle = z.infer<typeof RunExportBundleSchema>;

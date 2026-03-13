@@ -9,21 +9,28 @@ import {
   ExecutionManifestSchema,
   NetworkScopeSchema,
   PathScopeSchema,
+  PlannerAssistanceSchema,
+  PlannerProviderConfigSchema,
+  PlannerProviderStatusSchema,
   PlanSchema,
+  RunExportBundleSchema,
   RiskLevelSchema,
   RunEventSchema,
   RunLogSchema,
   SideEffectFamilySchema,
   ToolResultSchema,
   VerificationStatusSchema,
+  WorkflowProofReportSchema,
   WorkflowProofRecordSchema,
   WorkflowProofGateStatusSchema,
   WorkflowProofSummarySchema,
   WorkflowStateSchema
 } from "../core/schemas";
 import {
+  defaultRetentionPolicy,
   routeKinds,
   riskLevels,
+  sensitiveSessionDefaults,
   taskTypes,
   workflowSequence
 } from "./constants";
@@ -124,6 +131,7 @@ export const TaskIntentResponseSchema = z
     approval_requests: z.array(ApprovalRequestSchema),
     simulation_summary: SimulationSummarySchema.nullable(),
     diff_previews: z.array(DiffPreviewSchema),
+    planner_assistance: PlannerAssistanceSchema,
     preview_generated_at: z.string().datetime({ offset: true })
   })
   .strict();
@@ -140,9 +148,46 @@ export const PolicySnapshotResponseSchema = z
     workflow: z.literal(workflowSequence),
     local_first: z.literal(true),
     approval_required_for_risky_actions: z.literal(true),
-    app_started_at: z.string().datetime({ offset: true })
+    app_started_at: z.string().datetime({ offset: true }),
+    retention_policy: z
+      .object({
+        run_history_days: z.literal(defaultRetentionPolicy.run_history_days),
+        event_logs_days: z.literal(defaultRetentionPolicy.event_logs_days),
+        cache_days: z.literal(defaultRetentionPolicy.cache_days),
+        sensitive_session_cache_hours: z.literal(defaultRetentionPolicy.sensitive_session_cache_hours),
+        export_staging_encrypted_at_rest: z.literal(true)
+      })
+      .strict(),
+    sensitive_session_defaults: z
+      .object({
+        reduced_logging: z.literal(sensitiveSessionDefaults.reduced_logging),
+        tier2_memory_writes_enabled: z.literal(
+          sensitiveSessionDefaults.tier2_memory_writes_enabled
+        ),
+        tier3_analytics_writes_enabled: z.literal(
+          sensitiveSessionDefaults.tier3_analytics_writes_enabled
+        ),
+        minimal_summaries_only: z.literal(
+          sensitiveSessionDefaults.minimal_summaries_only
+        )
+      })
+      .strict()
   })
   .strict();
+
+export const PlannerStatusRequestSchema = z
+  .object({
+    session_id: z.string().min(1)
+  })
+  .strict();
+
+export const PlannerStatusResponseSchema = PlannerProviderStatusSchema;
+
+export const PlannerSettingsUpdateRequestSchema = PlannerProviderConfigSchema.omit({
+  source: true
+});
+
+export const PlannerSettingsUpdateResponseSchema = PlannerProviderStatusSchema;
 
 export const RunExecutionRequestSchema = z
   .object({
@@ -174,6 +219,41 @@ export const RunHistoryRequestSchema = z
 export const RunHistoryResponseSchema = z
   .object({
     runs: z.array(RunLogSchema)
+  })
+  .strict();
+
+export const RunDeleteRequestSchema = z
+  .object({
+    workspace_root: z.string().min(1),
+    run_id: z.string().regex(/^[A-Za-z0-9._-]+$/)
+  })
+  .strict();
+
+export const RunDeleteResponseSchema = z
+  .object({
+    run_id: z.string().min(1),
+    deleted: z.boolean(),
+    deleted_paths: z.array(z.string().min(1)),
+    message: z.string().min(1)
+  })
+  .strict();
+
+export const RunExportRequestSchema = z
+  .object({
+    workspace_root: z.string().min(1),
+    run_id: z.string().regex(/^[A-Za-z0-9._-]+$/)
+  })
+  .strict();
+
+export const RunExportResponseSchema = z
+  .object({
+    run_id: z.string().min(1),
+    staged_export_path: z.string().min(1),
+    exported_at: z.string().datetime({ offset: true }),
+    redaction_count: z.number().int().min(0),
+    placeholders: z.array(z.string().min(1)),
+    bundle: RunExportBundleSchema,
+    message: z.string().min(1)
   })
   .strict();
 
@@ -213,6 +293,13 @@ export const WorkflowProofSummaryRequestSchema = z
   })
   .strict();
 
+export const WorkflowProofReportRequestSchema = z
+  .object({
+    workspace_root: z.string().min(1),
+    limit: z.number().int().min(1).max(25)
+  })
+  .strict();
+
 export const WorkflowProofSummaryResponseSchema = z
   .object({
     summary: WorkflowProofSummarySchema,
@@ -220,6 +307,8 @@ export const WorkflowProofSummaryResponseSchema = z
     recent_journeys: z.array(WorkflowProofRecordSchema)
   })
   .strict();
+
+export const WorkflowProofReportResponseSchema = WorkflowProofReportSchema;
 
 export const RunEventEnvelopeSchema = z
   .object({
@@ -261,6 +350,22 @@ export const ipcContractMap = {
     direction: "main_to_renderer",
     payloadSchema: RunHistoryResponseSchema
   },
+  "run.delete.request": {
+    direction: "renderer_to_main",
+    payloadSchema: RunDeleteRequestSchema
+  },
+  "run.delete.response": {
+    direction: "main_to_renderer",
+    payloadSchema: RunDeleteResponseSchema
+  },
+  "run.export.request": {
+    direction: "renderer_to_main",
+    payloadSchema: RunExportRequestSchema
+  },
+  "run.export.response": {
+    direction: "main_to_renderer",
+    payloadSchema: RunExportResponseSchema
+  },
   "recall.search.query": {
     direction: "renderer_to_main",
     payloadSchema: RecallSearchRequestSchema
@@ -285,6 +390,14 @@ export const ipcContractMap = {
     direction: "main_to_renderer",
     payloadSchema: WorkflowProofSummaryResponseSchema
   },
+  "workflow.proof.report.get": {
+    direction: "renderer_to_main",
+    payloadSchema: WorkflowProofReportRequestSchema
+  },
+  "workflow.proof.report.response": {
+    direction: "main_to_renderer",
+    payloadSchema: WorkflowProofReportResponseSchema
+  },
   "policy.snapshot.get": {
     direction: "renderer_to_main",
     payloadSchema: PolicySnapshotRequestSchema
@@ -292,6 +405,22 @@ export const ipcContractMap = {
   "policy.snapshot.response": {
     direction: "main_to_renderer",
     payloadSchema: PolicySnapshotResponseSchema
+  },
+  "planner.status.get": {
+    direction: "renderer_to_main",
+    payloadSchema: PlannerStatusRequestSchema
+  },
+  "planner.status.response": {
+    direction: "main_to_renderer",
+    payloadSchema: PlannerStatusResponseSchema
+  },
+  "planner.settings.update": {
+    direction: "renderer_to_main",
+    payloadSchema: PlannerSettingsUpdateRequestSchema
+  },
+  "planner.settings.response": {
+    direction: "main_to_renderer",
+    payloadSchema: PlannerSettingsUpdateResponseSchema
   },
   "run.event.push": {
     direction: "main_to_renderer",
@@ -335,6 +464,22 @@ export const IpcEnvelopeSchema = z.discriminatedUnion("channel", [
     payload: RunHistoryResponseSchema
   }),
   z.object({
+    channel: z.literal("run.delete.request"),
+    payload: RunDeleteRequestSchema
+  }),
+  z.object({
+    channel: z.literal("run.delete.response"),
+    payload: RunDeleteResponseSchema
+  }),
+  z.object({
+    channel: z.literal("run.export.request"),
+    payload: RunExportRequestSchema
+  }),
+  z.object({
+    channel: z.literal("run.export.response"),
+    payload: RunExportResponseSchema
+  }),
+  z.object({
     channel: z.literal("recall.search.query"),
     payload: RecallSearchRequestSchema
   }),
@@ -359,12 +504,36 @@ export const IpcEnvelopeSchema = z.discriminatedUnion("channel", [
     payload: WorkflowProofSummaryResponseSchema
   }),
   z.object({
+    channel: z.literal("workflow.proof.report.get"),
+    payload: WorkflowProofReportRequestSchema
+  }),
+  z.object({
+    channel: z.literal("workflow.proof.report.response"),
+    payload: WorkflowProofReportResponseSchema
+  }),
+  z.object({
     channel: z.literal("policy.snapshot.get"),
     payload: PolicySnapshotRequestSchema
   }),
   z.object({
     channel: z.literal("policy.snapshot.response"),
     payload: PolicySnapshotResponseSchema
+  }),
+  z.object({
+    channel: z.literal("planner.status.get"),
+    payload: PlannerStatusRequestSchema
+  }),
+  z.object({
+    channel: z.literal("planner.status.response"),
+    payload: PlannerStatusResponseSchema
+  }),
+  z.object({
+    channel: z.literal("planner.settings.update"),
+    payload: PlannerSettingsUpdateRequestSchema
+  }),
+  z.object({
+    channel: z.literal("planner.settings.response"),
+    payload: PlannerSettingsUpdateResponseSchema
   }),
   RunEventEnvelopeSchema
 ]);
@@ -374,16 +543,26 @@ export type TaskIntentRequest = z.infer<typeof TaskIntentRequestSchema>;
 export type TaskIntentResponse = z.infer<typeof TaskIntentResponseSchema>;
 export type PolicySnapshotRequest = z.infer<typeof PolicySnapshotRequestSchema>;
 export type PolicySnapshotResponse = z.infer<typeof PolicySnapshotResponseSchema>;
+export type PlannerStatusRequest = z.infer<typeof PlannerStatusRequestSchema>;
+export type PlannerStatusResponse = z.infer<typeof PlannerStatusResponseSchema>;
+export type PlannerSettingsUpdateRequest = z.infer<typeof PlannerSettingsUpdateRequestSchema>;
+export type PlannerSettingsUpdateResponse = z.infer<typeof PlannerSettingsUpdateResponseSchema>;
 export type RunEventEnvelope = z.infer<typeof RunEventEnvelopeSchema>;
 export type RunExecutionRequest = z.infer<typeof RunExecutionRequestSchema>;
 export type RunExecutionResponse = z.infer<typeof RunExecutionResponseSchema>;
 export type RunHistoryRequest = z.infer<typeof RunHistoryRequestSchema>;
 export type RunHistoryResponse = z.infer<typeof RunHistoryResponseSchema>;
+export type RunDeleteRequest = z.infer<typeof RunDeleteRequestSchema>;
+export type RunDeleteResponse = z.infer<typeof RunDeleteResponseSchema>;
+export type RunExportRequest = z.infer<typeof RunExportRequestSchema>;
+export type RunExportResponse = z.infer<typeof RunExportResponseSchema>;
 export type RecallEntry = z.infer<typeof RecallEntrySchema>;
 export type RecallSearchRequest = z.infer<typeof RecallSearchRequestSchema>;
 export type RecallSearchResponse = z.infer<typeof RecallSearchResponseSchema>;
 export type WorkflowProofSummaryRequest = z.infer<typeof WorkflowProofSummaryRequestSchema>;
 export type WorkflowProofSummaryResponse = z.infer<typeof WorkflowProofSummaryResponseSchema>;
+export type WorkflowProofReportRequest = z.infer<typeof WorkflowProofReportRequestSchema>;
+export type WorkflowProofReportResponse = z.infer<typeof WorkflowProofReportResponseSchema>;
 export type TaskRoute = z.infer<typeof TaskRouteSchema>;
 export type DiffPreview = z.infer<typeof DiffPreviewSchema>;
 export type ApprovalRequest = z.infer<typeof ApprovalRequestSchema>;

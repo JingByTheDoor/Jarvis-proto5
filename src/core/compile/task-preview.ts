@@ -5,6 +5,7 @@ import type {
   Action,
   CompiledAction,
   ExecutionManifest,
+  PlannerAssistance,
   Plan,
   PolicySnapshot,
   ToolResult
@@ -30,12 +31,24 @@ import type {
 import {
   parseGuardedShellInstruction,
   parseSupportedEditInstruction,
-  routeTaskIntent
+  routeTaskIntent,
+  shouldAttemptPlannerNormalization
 } from "../planning/task-routing";
 import {
   classifyShellCommand
 } from "../tools/guarded-shell-tool";
 import { toolRegistry, type SupportedToolName } from "../tools/tool-registry";
+import type { TaskPlanner } from "../integrations/task-planner";
+
+export interface TaskPreviewOptions {
+  readonly planner?: TaskPlanner;
+}
+
+interface PreviewTaskContext {
+  readonly originalTask: string;
+  readonly effectiveTask: string;
+  readonly plannerAssistance: PlannerAssistance;
+}
 
 function deterministicId(prefix: string, seed: string): string {
   return `${prefix}-${createHash("sha256").update(seed).digest("hex").slice(0, 12)}`;
@@ -49,18 +62,105 @@ function addMinutes(isoTimestamp: string, minutes: number): string {
 
 function createPolicySnapshot(generatedAt: string): PolicySnapshot {
   return {
-    version: "phase-6-proof-gate",
+    version: "phase-6-planner-assist",
     workflow: "PLAN -> COMPILE -> SIMULATE -> APPROVAL -> EXECUTE -> ATTEST -> REVIEW",
     routing_mode: "local_first_stubbed",
     generated_at: generatedAt
   };
 }
 
+function createPlannerAssistance(
+  input: PreviewTaskContext["plannerAssistance"]
+): PlannerAssistance {
+  return {
+    ...input,
+    notes: [...input.notes],
+    provider_status: {
+      ...input.provider_status,
+      available_models: [...input.provider_status.available_models],
+      notes: [...input.provider_status.notes]
+    }
+  };
+}
+
+function createNotRequestedPlannerAssistance(
+  task: string,
+  planner?: TaskPlanner
+): PlannerAssistance {
+  const providerStatus =
+    planner?.getCachedStatus() ?? {
+      adapter_name: "planner.null_adapter",
+      provider_kind: "null_adapter",
+      configured: false,
+      reachable: false,
+      last_check_at: null,
+      mode: "null_adapter",
+      read_available: false,
+      write_available: false,
+      model_name: null,
+      endpoint_url: null,
+      available_models: [],
+      notes: [
+        "Planner assistance is unavailable in this path, so deterministic routing stays in control."
+      ],
+      source: "built_in_default"
+    };
+
+  return {
+    status: providerStatus.mode === "null_adapter" ? "null_adapter" : "not_requested",
+    original_task: task,
+    normalized_task: task,
+    used_for_preview: false,
+    confidence: null,
+    rationale:
+      "JARVIS kept the original task text because the deterministic v1 route was already sufficient or planner assistance was not requested.",
+    route_hint: null,
+    task_type_hint: null,
+    notes: [
+      "Deterministic routing stays authoritative for explicit supported patterns.",
+      ...providerStatus.notes
+    ],
+    provider_status: providerStatus
+  };
+}
+
+function applyPlannerAssistanceToRoute(
+  route: TaskRoute,
+  plannerAssistance: PlannerAssistance
+): TaskRoute {
+  if (!plannerAssistance.used_for_preview) {
+    return route;
+  }
+
+  return {
+    ...route,
+    operator_explanation:
+      route.chosen_route === "local_guarded_shell"
+        ? "The local planner reduced the request into the explicit guarded-shell escape hatch, and JARVIS still kept the audited compile, simulate, approval, execute, attestation, and review workflow intact."
+        : "The local planner reduced the natural-language request into a supported v1 typed-tool shape, and JARVIS kept the route on the cheapest sufficient local path."
+  };
+}
+
+function appendPlannerNote(
+  notes: readonly string[],
+  plannerAssistance: PlannerAssistance
+): string[] {
+  if (!plannerAssistance.used_for_preview) {
+    return [...notes];
+  }
+
+  return [
+    ...notes,
+    `Planner normalization: ${plannerAssistance.original_task} -> ${plannerAssistance.normalized_task}`
+  ];
+}
+
 function createFailureResponse(
   request: TaskIntentRequest,
   route: TaskRoute,
   workflowState: TaskIntentResponse["workflow_state"],
-  message: string
+  message: string,
+  plannerAssistance: PlannerAssistance
 ): TaskIntentResponse {
   return {
     accepted: false,
@@ -74,6 +174,7 @@ function createFailureResponse(
     approval_requests: [],
     simulation_summary: null,
     diff_previews: [],
+    planner_assistance: createPlannerAssistance(plannerAssistance),
     preview_generated_at: request.requested_at
   };
 }
@@ -262,7 +363,11 @@ function selectInspectionTarget(workspaceRoot: string): string {
   return path.join(workspaceRoot, "package.json");
 }
 
-function buildInspectionPreview(request: TaskIntentRequest, route: TaskRoute): TaskIntentResponse {
+function buildInspectionPreview(
+  request: TaskIntentRequest,
+  route: TaskRoute,
+  context: PreviewTaskContext
+): TaskIntentResponse {
   const workspaceRoot = request.workspace_roots[0];
   const expires_at = addMinutes(request.requested_at, 15);
   const policy_snapshot = createPolicySnapshot(request.requested_at);
@@ -322,15 +427,15 @@ function buildInspectionPreview(request: TaskIntentRequest, route: TaskRoute): T
 
   const plan: Plan = {
     id: deterministicId("plan", `${request.task}:${request.requested_at}`),
-    user_goal: request.task,
+    user_goal: context.originalTask,
     summary: `Inspect the workspace root, current git state, and ${path.win32.basename(
       targetResolution.canonicalPath
     )} before proposing a change.`,
-    planning_notes: [
+    planning_notes: appendPlannerNote([
       "Use typed tools first.",
       "Keep the preview read-only.",
       "Compile every preview step into a typed manifest."
-    ],
+    ], context.plannerAssistance),
     risk_summary: "Read-only repo inspection through typed local tools.",
     requires_approval: false,
     actions: [...actions],
@@ -401,10 +506,14 @@ function buildInspectionPreview(request: TaskIntentRequest, route: TaskRoute): T
     session_id: request.session_id,
     expires_at
   });
-  const evaluatedRoute = {
+  const routeWithRisk: TaskRoute = {
     ...route,
     risk_class: simulationBundle.simulation_summary.highest_risk
-  } satisfies TaskRoute;
+  };
+  const evaluatedRoute = applyPlannerAssistanceToRoute(
+    routeWithRisk,
+    context.plannerAssistance
+  );
   const evaluatedPlan = applySimulationRiskSummary(plan, simulationBundle.simulation_summary);
 
   return {
@@ -432,6 +541,7 @@ function buildInspectionPreview(request: TaskIntentRequest, route: TaskRoute): T
     approval_requests: simulationBundle.approval_requests,
     simulation_summary: simulationBundle.simulation_summary,
     diff_previews: [],
+    planner_assistance: createPlannerAssistance(context.plannerAssistance),
     preview_generated_at: request.requested_at
   };
 }
@@ -465,12 +575,16 @@ function deriveEditedContent(currentText: string, task: string): { nextContent: 
   };
 }
 
-function buildEditPreview(request: TaskIntentRequest, route: TaskRoute): TaskIntentResponse {
+function buildEditPreview(
+  request: TaskIntentRequest,
+  route: TaskRoute,
+  context: PreviewTaskContext
+): TaskIntentResponse {
   const workspaceRoot = request.workspace_roots[0];
   const expires_at = addMinutes(request.requested_at, 15);
   const policy_snapshot = createPolicySnapshot(request.requested_at);
   const canonicalPolicy = new DefaultCanonicalPathPolicy();
-  const editInstruction = parseSupportedEditInstruction(request.task);
+  const editInstruction = parseSupportedEditInstruction(context.effectiveTask);
   if (!editInstruction) {
     throw new Error(
       'Phase 2 edit preview currently supports only `replace "old" with "new" in <path>` and `append "text" to <path>`.'
@@ -488,7 +602,7 @@ function buildEditPreview(request: TaskIntentRequest, route: TaskRoute): TaskInt
     "Failed to read the target file for preview."
   );
   const currentText = String((readResult.output as { text: string }).text);
-  const { nextContent } = deriveEditedContent(currentText, request.task);
+  const { nextContent } = deriveEditedContent(currentText, context.effectiveTask);
   const diffResult = requireOkToolResult(
     toolRegistry.diff_file.execute({
       path: targetResolution.canonicalPath,
@@ -552,15 +666,15 @@ function buildEditPreview(request: TaskIntentRequest, route: TaskRoute): TaskInt
 
   const plan: Plan = {
     id: deterministicId("plan", `${request.task}:${request.requested_at}`),
-    user_goal: request.task,
+    user_goal: context.originalTask,
     summary: `Read ${path.win32.basename(
       targetResolution.canonicalPath
     )}, preview the exact diff, and compile a single typed write action for approval.`,
-    planning_notes: [
+    planning_notes: appendPlannerNote([
       "Use typed tools first.",
       "Do not execute the write during preview.",
       "Require exact diff inspection before any later approval."
-    ],
+    ], context.plannerAssistance),
     risk_summary: "Local workspace write remains approval-gated; preview stays deterministic and local.",
     requires_approval: true,
     actions: [...actions],
@@ -639,10 +753,14 @@ function buildEditPreview(request: TaskIntentRequest, route: TaskRoute): TaskInt
     session_id: request.session_id,
     expires_at
   });
-  const evaluatedRoute = {
+  const routeWithRisk: TaskRoute = {
     ...route,
     risk_class: simulationBundle.simulation_summary.highest_risk
-  } satisfies TaskRoute;
+  };
+  const evaluatedRoute = applyPlannerAssistanceToRoute(
+    routeWithRisk,
+    context.plannerAssistance
+  );
   const evaluatedPlan = applySimulationRiskSummary(plan, simulationBundle.simulation_summary);
 
   return {
@@ -671,19 +789,21 @@ function buildEditPreview(request: TaskIntentRequest, route: TaskRoute): TaskInt
     approval_requests: simulationBundle.approval_requests,
     simulation_summary: simulationBundle.simulation_summary,
     diff_previews: [...diffPreviews],
+    planner_assistance: createPlannerAssistance(context.plannerAssistance),
     preview_generated_at: request.requested_at
   };
 }
 
 function buildGuardedShellPreview(
   request: TaskIntentRequest,
-  route: TaskRoute
+  route: TaskRoute,
+  context: PreviewTaskContext
 ): TaskIntentResponse {
   const workspaceRoot = request.workspace_roots[0];
   const expires_at = addMinutes(request.requested_at, 10);
   const policy_snapshot = createPolicySnapshot(request.requested_at);
   const canonicalPolicy = new DefaultCanonicalPathPolicy();
-  const shellInstruction = parseGuardedShellInstruction(request.task);
+  const shellInstruction = parseGuardedShellInstruction(context.effectiveTask);
 
   if (!shellInstruction) {
     throw new Error(
@@ -723,13 +843,13 @@ function buildGuardedShellPreview(
 
   const plan: Plan = {
     id: deterministicId("plan", `${request.task}:${request.requested_at}`),
-    user_goal: request.task,
+    user_goal: context.originalTask,
     summary: `Compile the explicit guarded shell command for ${workingDirectory.canonicalPath}, require approval, and keep the receipt reviewable.`,
-    planning_notes: [
+    planning_notes: appendPlannerNote([
       "Use guarded shell only as an escape hatch.",
       "Do not bypass a sufficient typed tool path.",
       "Capture a structured receipt for review and attestation."
-    ],
+    ], context.plannerAssistance),
     risk_summary: isMutating
       ? "The guarded shell command is mutating and will remain DANGER plus approve-once only."
       : "The guarded shell command is read-only but broader than typed tools, so it remains CAUTION and approval-gated.",
@@ -760,10 +880,14 @@ function buildGuardedShellPreview(
     session_id: request.session_id,
     expires_at
   });
-  const evaluatedRoute = {
+  const routeWithRisk: TaskRoute = {
     ...route,
     risk_class: simulationBundle.simulation_summary.highest_risk
-  } satisfies TaskRoute;
+  };
+  const evaluatedRoute = applyPlannerAssistanceToRoute(
+    routeWithRisk,
+    context.plannerAssistance
+  );
   const evaluatedPlan = applySimulationRiskSummary(plan, simulationBundle.simulation_summary);
 
   return {
@@ -792,28 +916,66 @@ function buildGuardedShellPreview(
     approval_requests: simulationBundle.approval_requests,
     simulation_summary: simulationBundle.simulation_summary,
     diff_previews: [],
+    planner_assistance: createPlannerAssistance(context.plannerAssistance),
     preview_generated_at: request.requested_at
   };
 }
 
-export function createTaskPreview(request: TaskIntentRequest): TaskIntentResponse {
-  const route = routeTaskIntent(request.task);
+async function createPreviewTaskContext(
+  request: TaskIntentRequest,
+  options: TaskPreviewOptions
+): Promise<{
+  readonly route: TaskRoute;
+  readonly context: PreviewTaskContext;
+}> {
+  let plannerAssistance = createNotRequestedPlannerAssistance(request.task, options.planner);
+  let effectiveTask = request.task;
+  let route = routeTaskIntent(effectiveTask);
+
+  if (options.planner && shouldAttemptPlannerNormalization(request.task)) {
+    plannerAssistance = await options.planner.normalizeTask({
+      task: request.task,
+      workspace_root: request.workspace_roots[0]
+    });
+
+    if (plannerAssistance.used_for_preview) {
+      effectiveTask = plannerAssistance.normalized_task;
+      route = routeTaskIntent(effectiveTask);
+    }
+  }
+
+  return {
+    route,
+    context: {
+      originalTask: request.task,
+      effectiveTask,
+      plannerAssistance
+    }
+  };
+}
+
+export async function createTaskPreview(
+  request: TaskIntentRequest,
+  options: TaskPreviewOptions = {}
+): Promise<TaskIntentResponse> {
+  const { route, context } = await createPreviewTaskContext(request, options);
 
   try {
     switch (route.chosen_route) {
       case "local_read_tools":
-        return buildInspectionPreview(request, route);
+        return buildInspectionPreview(request, route, context);
       case "local_repo_file_tools":
-        return buildEditPreview(request, route);
+        return buildEditPreview(request, route, context);
       case "local_guarded_shell":
-        return buildGuardedShellPreview(request, route);
+        return buildGuardedShellPreview(request, route, context);
       case "manual_confirmation_required":
       default:
         return createFailureResponse(
           request,
           route,
           "idle",
-          "Phase 2 supports repo inspection plus explicit replace/append edit previews only."
+          "The current deterministic slice supports repo inspection, exact replace/append edit previews, and the explicit guarded-shell escape hatch only.",
+          context.plannerAssistance
         );
     }
   } catch (error) {
@@ -821,7 +983,8 @@ export function createTaskPreview(request: TaskIntentRequest): TaskIntentRespons
       request,
       route,
       "failed",
-      error instanceof Error ? error.message : "Failed to prepare the preview."
+      error instanceof Error ? error.message : "Failed to prepare the preview.",
+      context.plannerAssistance
     );
   }
 }
