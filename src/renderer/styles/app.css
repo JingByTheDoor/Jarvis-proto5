@@ -202,6 +202,7 @@ button {
 
 .workspace-grid,
 .summary-grid,
+.capture-grid,
 .rail-preview-grid {
   display: grid;
   gap: 18px;
@@ -352,6 +353,11 @@ button {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
+.capture-grid {
+  margin-top: 18px;
+  grid-template-columns: 1fr;
+}
+
 .summary-card {
   border: 1px solid rgba(134, 161, 191, 0.14);
   border-radius: 20px;
@@ -368,6 +374,21 @@ button {
 .detail-rail p {
   margin: 8px 0 0;
   color: #bfd0e1;
+}
+
+.capture-checklist {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.capture-checklist p {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(134, 161, 191, 0.14);
+  background: rgba(5, 12, 22, 0.62);
 }
 
 .artifact-list {

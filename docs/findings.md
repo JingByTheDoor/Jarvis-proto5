@@ -47,3 +47,6 @@
 - Per-run delete/export controls belong to the run-history layer, not the execution planner; treating them as typed privileged app-data operations keeps the renderer thin without reopening workflow approval logic.
 - Export staging should stay encrypted at rest even when the staged payload is already sanitized; otherwise the app would introduce a second weaker storage posture just to support review-data export.
 - Retention and sensitive-session defaults are easier to trust when they come from the typed policy snapshot instead of being implied only through static UI copy.
+- Background proof measurements are useful for local introspection, but they are too noisy to serve as the gate-counting source of truth once the operator needs clean evidence; guided capture is the safer way to prove product value without broadening the architecture.
+- A proof gate tied to planner-assisted value should record whether planner assistance actually normalized the journey; otherwise explicit deterministic task shapes could make the gate look healthier than the real product experience.
+- Guided capture should auto-disarm after it tags a journey; that avoids accidentally counting a string of unrelated previews as one deliberate proof-gate session.

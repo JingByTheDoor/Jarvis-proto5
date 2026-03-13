@@ -19,6 +19,7 @@ import {
   persistenceStatuses,
   previewConfidenceLevels,
   proofGateCriterionStatuses,
+  workflowProofEvidenceOrigins,
   proofGateOverallStatuses,
   provenanceTypes,
   riskLevels,
@@ -76,6 +77,7 @@ export const PlannerPreferenceSourceSchema = z.enum(plannerPreferenceSources);
 export const PlannerAssistanceStatusSchema = z.enum(plannerAssistanceStatuses);
 export const ProofGateCriterionStatusSchema = z.enum(proofGateCriterionStatuses);
 export const ProofGateOverallStatusSchema = z.enum(proofGateOverallStatuses);
+export const WorkflowProofEvidenceOriginSchema = z.enum(workflowProofEvidenceOrigins);
 
 export const NetworkScopeRuleSchema = z
   .object({
@@ -368,6 +370,10 @@ export const WorkflowProofRecordSchema = z
     journey_kind: WorkflowJourneyKindSchema,
     session_id: z.string().min(1),
     workspace_root: AbsolutePathSchema,
+    evidence_origin: WorkflowProofEvidenceOriginSchema,
+    capture_label: z.string().min(1).nullable(),
+    counts_toward_gate: z.boolean(),
+    planner_assistance_used: z.boolean(),
     route_kind: RouteKindSchema.nullable(),
     task_type: TaskTypeSchema.nullable(),
     risk_class: RiskLevelSchema.nullable(),

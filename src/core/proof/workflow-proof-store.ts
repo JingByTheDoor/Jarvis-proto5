@@ -152,16 +152,33 @@ function summarizeWorkflowProofRecords(
   });
 }
 
+function getGateEligibleRecords(
+  records: readonly WorkflowProofRecord[]
+): WorkflowProofRecord[] {
+  return records.filter((record) => record.counts_toward_gate);
+}
+
+function getGuidedCaptureRecords(
+  records: readonly WorkflowProofRecord[]
+): WorkflowProofRecord[] {
+  return records.filter(
+    (record) => record.evidence_origin === "guided_operator_capture"
+  );
+}
+
 function createSummarySnapshot(
   orderedRecords: readonly WorkflowProofRecord[],
   limit: number
 ): WorkflowProofSummarySnapshot {
+  const gateEligibleRecords = getGateEligibleRecords(orderedRecords);
+  const guidedCaptureRecords = getGuidedCaptureRecords(orderedRecords);
+
   return {
-    summary: summarizeWorkflowProofRecords(orderedRecords),
+    summary: summarizeWorkflowProofRecords(gateEligibleRecords),
     gate_status: WorkflowProofGateStatusSchema.parse(
-      evaluateWorkflowProofGate(orderedRecords)
+      evaluateWorkflowProofGate(gateEligibleRecords)
     ),
-    recent_journeys: orderedRecords.slice(0, limit)
+    recent_journeys: guidedCaptureRecords.slice(0, limit)
   };
 }
 

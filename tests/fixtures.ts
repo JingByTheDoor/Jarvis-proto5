@@ -419,6 +419,10 @@ export const validWorkflowProofRecord: WorkflowProofRecord = {
   journey_kind: "golden_edit_workflow",
   session_id: "phase-6-proof-gate",
   workspace_root: WORKSPACE_ROOT,
+  evidence_origin: "guided_operator_capture",
+  capture_label: "planner-assisted-golden-edit",
+  counts_toward_gate: true,
+  planner_assistance_used: true,
   route_kind: "local_repo_file_tools",
   task_type: "repo_edit",
   risk_class: "DANGER",
@@ -543,7 +547,7 @@ export const validWorkflowProofGateStatus: WorkflowProofGateStatus = {
     threshold_median: null
   },
   assumption_note:
-    "Assumption: candidate_ready requires at least 3 recent golden edit journeys, 1 resumed review_ready journey, 6 qualifying samples for trend checks, resumed task-to-preview speed no worse than the overall golden-workflow median, and recent medians at or below 4 workflow steps and 5 operator clicks."
+    "Assumption: proof-gate evaluation uses guided operator captures only. Candidate_ready requires at least 3 recent golden edit journeys, 1 resumed review_ready journey, 6 qualifying samples for trend checks, resumed task-to-preview speed no worse than the overall golden-workflow median, and recent medians at or below 4 workflow steps and 5 operator clicks."
 };
 
 export const validWorkflowProofSummaryResponse: WorkflowProofSummaryResponse = {
@@ -577,6 +581,7 @@ export const validWorkflowProofReportResponse: WorkflowProofReportResponse = {
 - Generated at: ${ISO_LATER}
 - Workspace: ${WORKSPACE_ROOT}
 - Overall gate: collecting_evidence
+- Evidence policy: guided operator captures only
 
 ## Summary
 - Golden workflow review_ready: 1 / 1
@@ -604,6 +609,10 @@ export const validWorkflowProofReportResponse: WorkflowProofReportResponse = {
 ## Recent Journeys
 ### journey-1
 - Kind: golden_edit_workflow
+- Evidence source: guided_operator_capture
+- Capture label: planner-assisted-golden-edit
+- Counts toward gate: yes
+- Planner assist used: yes
 - State: review_ready
 - Route: local_repo_file_tools
 - Resume used: yes

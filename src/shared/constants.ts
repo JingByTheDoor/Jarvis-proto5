@@ -296,6 +296,14 @@ export const proofGateOverallStatuses = [
 ] as const;
 export type ProofGateOverallStatus = (typeof proofGateOverallStatuses)[number];
 
+export const workflowProofEvidenceOrigins = [
+  "background_measurement",
+  "guided_operator_capture"
+] as const;
+
+export type WorkflowProofEvidenceOrigin =
+  (typeof workflowProofEvidenceOrigins)[number];
+
 export const defaultRetentionPolicy = {
   run_history_days: 30,
   event_logs_days: 7,

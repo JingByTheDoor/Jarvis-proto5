@@ -290,6 +290,7 @@ Rules:
 - Workflow-proof records may store route, workflow state, speed-gate timestamps and durations, manifest/run ids, resume usage, and step/click counts only.
 - Raw task text, secrets, and provider credentials never enter workflow-proof storage.
 - Workflow-proof records remain encrypted at rest under the local cache storage class.
+- Guided operator capture is the gate-counting source of truth in this slice: background measurements may still be stored locally, but only explicitly guided captures count toward proof-gate readiness.
 - Proof-gate evaluation remains conservative and local-only: `candidate_ready` is allowed only after enough recent golden-workflow evidence exists, recent latency trends do not regress, recent workflow-step and click medians stay below the local proof thresholds, and at least one resumed journey reaches `review_ready`.
 - The local proof gate must explicitly track cold start to usable composer, task to preview, preview to approval, approval to visible first result, steps/clicks, and repeat-task speed with context reuse before broader expansion opens.
 - Every proof-gate criterion must remain inspectable: sample windows, required counts, success counts, recent/previous medians, and threshold medians belong in typed local proof data rather than being implied only through prose.
@@ -326,6 +327,7 @@ Rules:
 - Explicit supported task text bypasses the planner; deterministic routing stays first for already-supported shapes.
 - The current planner adapter is loopback-only and Windows-local by policy in this slice.
 - Null-adapter planner behavior must remain deterministic and non-throwing on normal UI paths.
+- Guided proof capture for the gate should prefer natural-language tasks that actually use planner assistance; explicit supported task text may still work, but it does not count as planner-assisted evidence.
 
 ## Guarded Shell
 

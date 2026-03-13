@@ -53,6 +53,10 @@ describe("workflow proof store", () => {
         ...validWorkflowProofRecord,
         workspace_root: repo.root,
         journey_id: "journey-golden-2",
+        evidence_origin: "background_measurement",
+        capture_label: null,
+        counts_toward_gate: false,
+        planner_assistance_used: false,
         first_result_at: null,
         approval_to_first_result_ms: null,
         execute_to_first_result_ms: null,
@@ -65,6 +69,10 @@ describe("workflow proof store", () => {
         ...validWorkflowProofRecord,
         workspace_root: repo.root,
         journey_id: "journey-inspect-1",
+        evidence_origin: "background_measurement",
+        capture_label: null,
+        counts_toward_gate: false,
+        planner_assistance_used: false,
         journey_kind: "inspection_only",
         route_kind: "local_read_tools",
         task_type: "repo_inspection",
@@ -88,18 +96,20 @@ describe("workflow proof store", () => {
       );
 
       expect(fs.existsSync(persistedPath)).toBe(true);
-      expect(summarySnapshot.summary.golden_workflow_attempts).toBe(2);
+      expect(summarySnapshot.summary.golden_workflow_attempts).toBe(1);
       expect(summarySnapshot.summary.golden_workflow_review_ready).toBe(1);
-      expect(summarySnapshot.summary.golden_workflow_stability_rate).toBe(0.5);
+      expect(summarySnapshot.summary.golden_workflow_stability_rate).toBe(1);
       expect(summarySnapshot.summary.median_cold_start_to_composer_ms).toBe(500);
       expect(summarySnapshot.summary.median_preview_to_approval_ms).toBe(2000);
       expect(summarySnapshot.summary.median_repeat_task_to_preview_ms).toBe(1000);
-      expect(summarySnapshot.summary.resume_journeys).toBe(2);
+      expect(summarySnapshot.summary.resume_journeys).toBe(1);
       expect(summarySnapshot.gate_status.overall_status).toBe("collecting_evidence");
-      expect(summarySnapshot.recent_journeys[0]?.journey_id).toBe("journey-inspect-1");
+      expect(summarySnapshot.recent_journeys).toHaveLength(1);
+      expect(summarySnapshot.recent_journeys[0]?.journey_id).toBe("journey-golden-1");
       expect(reportSnapshot.generated_at).toBe("2026-03-11T19:11:00.000Z");
+      expect(reportSnapshot.report_markdown).toContain("guided operator captures only");
       expect(reportSnapshot.report_markdown).toContain("## Gate Criteria");
-      expect(reportSnapshot.report_markdown).toContain("### journey-inspect-1");
+      expect(reportSnapshot.report_markdown).toContain("### journey-golden-1");
     } finally {
       repo.cleanup();
     }

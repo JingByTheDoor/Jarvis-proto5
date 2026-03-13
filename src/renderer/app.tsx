@@ -22,7 +22,8 @@ import type {
 import type {
   ApprovalDecisionKind,
   ApprovalScopeClass,
-  WorkflowJourneyKind
+  WorkflowJourneyKind,
+  WorkflowProofEvidenceOrigin
 } from "../shared/constants";
 import { getJarvisDesktopApi } from "./desktop-api";
 import { CommandCenterPage } from "./pages/command-center-page";
@@ -45,6 +46,15 @@ interface PageNavigationItem {
 }
 
 type RunActionKind = "delete" | "export";
+type GuidedCaptureStatus = "idle" | "armed" | "in_progress" | "completed";
+
+interface GuidedCaptureState {
+  readonly armed: boolean;
+  readonly draftLabel: string;
+  readonly activeLabel: string | null;
+  readonly status: GuidedCaptureStatus;
+  readonly message: string;
+}
 
 const pageNavigationItems: readonly PageNavigationItem[] = [
   {
@@ -76,10 +86,20 @@ const pageNavigationItems: readonly PageNavigationItem[] = [
 
 const SESSION_ID = "phase-6-proof-gate";
 const WORKSPACE_ROOT = "D:\\Jarvis-proto5 repo\\Jarvis-proto5";
+const DEFAULT_GUIDED_CAPTURE_LABEL = "planner-assisted-golden-edit";
 const DEFAULT_PLANNER_DRAFT: PlannerSettingsUpdateRequest = {
   provider_kind: "local_ollama",
   model_name: "qwen2.5:3b",
   endpoint_url: "http://127.0.0.1:11434"
+};
+
+const DEFAULT_GUIDED_CAPTURE_STATE: GuidedCaptureState = {
+  armed: false,
+  draftLabel: DEFAULT_GUIDED_CAPTURE_LABEL,
+  activeLabel: null,
+  status: "idle",
+  message:
+    "Arm guided capture before the next natural-language planner-assisted safe edit journey if you want it to count toward the proof gate."
 };
 
 function selectApprovalScopeClass(
@@ -103,6 +123,10 @@ function selectApprovalScopeClass(
 
 function createWorkflowJourneyId(): string {
   return `journey-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function createGuidedCaptureLabel(): string {
+  return `guided-capture-${Date.now().toString(36)}`;
 }
 
 function diffMilliseconds(startAt: string | null, endAt: string | null): number | null {
@@ -169,6 +193,8 @@ function createWorkflowProofRecord(input: {
   readonly journeyId: string;
   readonly sessionId: string;
   readonly workspaceRoot: string;
+  readonly evidenceOrigin: WorkflowProofEvidenceOrigin;
+  readonly captureLabel: string | null;
   readonly composerReadyAt: string | null;
   readonly coldStartToComposerMs: number | null;
   readonly previewRequestedAt: string;
@@ -180,6 +206,10 @@ function createWorkflowProofRecord(input: {
     journey_kind: "unsupported_workflow",
     session_id: input.sessionId,
     workspace_root: input.workspaceRoot,
+    evidence_origin: input.evidenceOrigin,
+    capture_label: input.captureLabel,
+    counts_toward_gate: false,
+    planner_assistance_used: false,
     route_kind: null,
     task_type: null,
     risk_class: null,
@@ -232,6 +262,52 @@ function mergeWorkflowProofRecord(
   return nextRecord;
 }
 
+function createGuidedCaptureMessage(input: {
+  readonly armed: boolean;
+  readonly captureLabel: string | null;
+  readonly workflowRecord: WorkflowProofRecord | null;
+}): string {
+  if (!input.armed && !input.captureLabel && !input.workflowRecord) {
+    return DEFAULT_GUIDED_CAPTURE_STATE.message;
+  }
+
+  if (input.armed && !input.workflowRecord) {
+    return `Armed: the next preview will tag a guided capture as "${input.captureLabel ?? DEFAULT_GUIDED_CAPTURE_LABEL}".`;
+  }
+
+  if (!input.workflowRecord) {
+    return "Guided capture is preparing the next proof record.";
+  }
+
+  if (!input.workflowRecord.counts_toward_gate) {
+    if (input.workflowRecord.journey_kind !== "golden_edit_workflow") {
+      return "Captured this journey, but it does not count toward the proof gate because it did not stay on the golden edit route.";
+    }
+
+    if (!input.workflowRecord.planner_assistance_used) {
+      return "Captured this journey, but it does not count toward the proof gate because planner assistance was not used for preview.";
+    }
+  }
+
+  if (input.workflowRecord.workflow_state === "review_ready") {
+    return `Capture "${input.workflowRecord.capture_label ?? "guided"}" completed and counts toward the proof gate.`;
+  }
+
+  if (input.workflowRecord.workflow_state === "failed" || input.workflowRecord.workflow_state === "aborted") {
+    return `Capture "${input.workflowRecord.capture_label ?? "guided"}" completed, but it did not reach review_ready.`;
+  }
+
+  if (input.workflowRecord.approval_required && !input.workflowRecord.approval_recorded_at) {
+    return `Capture "${input.workflowRecord.capture_label ?? "guided"}" is gate-eligible so far. Record approval and finish review to count it fully.`;
+  }
+
+  if (input.workflowRecord.execute_requested_at === null) {
+    return `Capture "${input.workflowRecord.capture_label ?? "guided"}" is tracking a planner-assisted golden edit journey. Execute and review it to finish the evidence sample.`;
+  }
+
+  return `Capture "${input.workflowRecord.capture_label ?? "guided"}" is in progress. Wait for review state to finish the sample.`;
+}
+
 export function JarvisApp() {
   const desktopApi = getJarvisDesktopApi();
   const [activePage, setActivePage] = useState<PageId>("command_center");
@@ -245,6 +321,8 @@ export function JarvisApp() {
   const [plannerDraft, setPlannerDraft] =
     useState<PlannerSettingsUpdateRequest>(DEFAULT_PLANNER_DRAFT);
   const [plannerSaveMessage, setPlannerSaveMessage] = useState<string | null>(null);
+  const [guidedCapture, setGuidedCapture] =
+    useState<GuidedCaptureState>(DEFAULT_GUIDED_CAPTURE_STATE);
   const [lastIntentResponse, setLastIntentResponse] = useState<TaskIntentResponse | null>(null);
   const [approvalReceipts, setApprovalReceipts] = useState<
     Record<string, ApprovalDecisionResponse>
@@ -276,6 +354,23 @@ export function JarvisApp() {
   const composerReadyAtRef = useRef<string>(new Date().toISOString());
   const deferredComposerValue = useDeferredValue(composerValue);
   const pendingApprovalRequests = lastIntentResponse?.approval_requests ?? [];
+  const guidedCaptureRecord =
+    currentWorkflowJourney?.evidence_origin === "guided_operator_capture"
+      ? currentWorkflowJourney
+      : null;
+  const guidedCaptureProgress = {
+    armed: guidedCapture.armed,
+    draftLabel: guidedCapture.draftLabel,
+    activeLabel: guidedCapture.activeLabel,
+    status: guidedCapture.status,
+    message: guidedCapture.message,
+    previewRecorded: Boolean(guidedCaptureRecord?.preview_ready_at),
+    plannerAssistanceUsed: guidedCaptureRecord?.planner_assistance_used ?? false,
+    goldenRouteReady: guidedCaptureRecord?.journey_kind === "golden_edit_workflow",
+    approvalRecorded: Boolean(guidedCaptureRecord?.approval_recorded_at),
+    reviewReady: guidedCaptureRecord?.workflow_state === "review_ready",
+    countsTowardGate: guidedCaptureRecord?.counts_toward_gate ?? false
+  };
   const canExecute =
     Boolean(lastIntentResponse?.manifest) &&
     (pendingApprovalRequests.length === 0 ||
@@ -404,6 +499,32 @@ export function JarvisApp() {
     }
   }
 
+  function handleToggleGuidedCapture(): void {
+    setGuidedCapture((currentState) => {
+      if (currentState.armed) {
+        return {
+          ...currentState,
+          armed: false,
+          activeLabel: null,
+          status: "idle",
+          message:
+            "Guided capture is disarmed. Background workflow measurements remain stored, but they do not count toward the proof gate."
+        };
+      }
+
+      const nextLabel =
+        currentState.draftLabel.trim() || createGuidedCaptureLabel();
+
+      return {
+        ...currentState,
+        armed: true,
+        activeLabel: nextLabel,
+        status: "armed",
+        message: `Armed guided capture "${nextLabel}". The next planner-assisted golden edit journey will be tagged for the proof gate.`
+      };
+    });
+  }
+
   async function handleDeleteRun(runId: string): Promise<void> {
     setPendingRunAction({
       runId,
@@ -464,12 +585,23 @@ export function JarvisApp() {
         activeJourney.execute_requested_at &&
         activeJourney.first_result_at === null
       ) {
-        persistWorkflowJourney(
-          mergeWorkflowProofRecord(activeJourney, {
-            first_result_at: event.timestamp,
-            updated_at: event.timestamp
-          })
-        );
+        const updatedJourney = mergeWorkflowProofRecord(activeJourney, {
+          first_result_at: event.timestamp,
+          updated_at: event.timestamp
+        });
+
+        persistWorkflowJourney(updatedJourney);
+        if (updatedJourney.evidence_origin === "guided_operator_capture") {
+          setGuidedCapture((currentState) => ({
+            ...currentState,
+            status: "in_progress",
+            message: createGuidedCaptureMessage({
+              armed: false,
+              captureLabel: updatedJourney.capture_label,
+              workflowRecord: updatedJourney
+            })
+          }));
+        }
       }
     });
 
@@ -505,12 +637,22 @@ export function JarvisApp() {
     setApprovalError(null);
     setLastExecutionResponse(null);
     setRunEvents([]);
+    const captureWasArmed = guidedCapture.armed;
+    const normalizedCaptureLabel = guidedCapture.draftLabel.trim();
+    const captureLabel = captureWasArmed
+      ? guidedCapture.activeLabel ??
+        (normalizedCaptureLabel.length > 0
+          ? normalizedCaptureLabel
+          : createGuidedCaptureLabel())
+      : null;
     const previewRequestedAt = new Date().toISOString();
     const previewStartedAt = Date.now();
     const initialJourney = createWorkflowProofRecord({
       journeyId: createWorkflowJourneyId(),
       sessionId: SESSION_ID,
       workspaceRoot: WORKSPACE_ROOT,
+      evidenceOrigin: captureWasArmed ? "guided_operator_capture" : "background_measurement",
+      captureLabel,
       composerReadyAt: composerReadyAtRef.current,
       coldStartToComposerMs: diffMilliseconds(
         policySnapshot?.app_started_at ?? null,
@@ -520,6 +662,15 @@ export function JarvisApp() {
       resumeUsed: pendingResumeRecallId !== null,
       resumedFromRecallId: pendingResumeRecallId
     });
+    if (captureWasArmed) {
+      setGuidedCapture((currentState) => ({
+        ...currentState,
+        armed: false,
+        activeLabel: captureLabel,
+        status: "in_progress",
+        message: `Capture "${captureLabel}" started. JARVIS is recording the next journey for proof-gate review.`
+      }));
+    }
     persistWorkflowJourney(initialJourney);
     const response = await desktopApi.submitTaskIntent({
       task: composerValue,
@@ -535,21 +686,38 @@ export function JarvisApp() {
     setPendingResumeRecallId(null);
 
     const previewReadyAt = new Date().toISOString();
+    const updatedJourney = mergeWorkflowProofRecord(initialJourney, {
+      journey_kind: deriveJourneyKind(response),
+      route_kind: response.route.chosen_route,
+      task_type: response.route.task_type,
+      risk_class: response.route.risk_class,
+      planner_assistance_used: response.planner_assistance.used_for_preview,
+      counts_toward_gate:
+        captureWasArmed &&
+        deriveJourneyKind(response) === "golden_edit_workflow" &&
+        response.planner_assistance.used_for_preview,
+      approval_required: response.approval_requests.length > 0,
+      preview_ready_at: previewReadyAt,
+      task_to_preview_ms: Math.max(0, Date.now() - previewStartedAt),
+      manifest_id: response.manifest?.manifest_id ?? null,
+      run_id: response.manifest?.run_id ?? null,
+      workflow_state: response.workflow_state,
+      updated_at: previewReadyAt
+    });
+
     persistWorkflowJourney(
-      mergeWorkflowProofRecord(initialJourney, {
-        journey_kind: deriveJourneyKind(response),
-        route_kind: response.route.chosen_route,
-        task_type: response.route.task_type,
-        risk_class: response.route.risk_class,
-        approval_required: response.approval_requests.length > 0,
-        preview_ready_at: previewReadyAt,
-        task_to_preview_ms: Math.max(0, Date.now() - previewStartedAt),
-        manifest_id: response.manifest?.manifest_id ?? null,
-        run_id: response.manifest?.run_id ?? null,
-        workflow_state: response.workflow_state,
-        updated_at: previewReadyAt
-      })
+      updatedJourney
     );
+    setGuidedCapture((currentState) => ({
+      ...currentState,
+      activeLabel: captureLabel,
+      status: captureWasArmed ? "in_progress" : currentState.status,
+      message: createGuidedCaptureMessage({
+        armed: captureWasArmed,
+        captureLabel,
+        workflowRecord: updatedJourney
+      })
+    }));
   }
 
   async function handleApprovalDecision(
@@ -586,17 +754,31 @@ export function JarvisApp() {
 
       const activeJourney = workflowJourneyRef.current;
       if (activeJourney) {
-        persistWorkflowJourney(
-          mergeWorkflowProofRecord(activeJourney, {
-            approval_recorded_at: approvalReceipt.accepted ? approvalReceipt.decided_at : activeJourney.approval_recorded_at,
-            operator_click_count: activeJourney.operator_click_count + 1,
-            workflow_state:
-              approvalReceipt.accepted && decision === "deny"
-                ? "aborted"
-                : activeJourney.workflow_state,
-            updated_at: approvalReceipt.decided_at
-          })
-        );
+        const updatedJourney = mergeWorkflowProofRecord(activeJourney, {
+          approval_recorded_at: approvalReceipt.accepted ? approvalReceipt.decided_at : activeJourney.approval_recorded_at,
+          operator_click_count: activeJourney.operator_click_count + 1,
+          workflow_state:
+            approvalReceipt.accepted && decision === "deny"
+              ? "aborted"
+              : activeJourney.workflow_state,
+          updated_at: approvalReceipt.decided_at
+        });
+
+        persistWorkflowJourney(updatedJourney);
+        if (updatedJourney.evidence_origin === "guided_operator_capture") {
+          setGuidedCapture((currentState) => ({
+            ...currentState,
+            status:
+              updatedJourney.workflow_state === "aborted"
+                ? "completed"
+                : "in_progress",
+            message: createGuidedCaptureMessage({
+              armed: false,
+              captureLabel: updatedJourney.capture_label,
+              workflowRecord: updatedJourney
+            })
+          }));
+        }
       }
     } catch (error) {
       setApprovalError(
@@ -615,14 +797,25 @@ export function JarvisApp() {
     const executeRequestedAt = new Date().toISOString();
     const activeJourney = workflowJourneyRef.current;
     if (activeJourney) {
-      persistWorkflowJourney(
-        mergeWorkflowProofRecord(activeJourney, {
-          execute_requested_at: executeRequestedAt,
-          operator_click_count: activeJourney.operator_click_count + 1,
-          workflow_state: "executing",
-          updated_at: executeRequestedAt
-        })
-      );
+      const updatedJourney = mergeWorkflowProofRecord(activeJourney, {
+        execute_requested_at: executeRequestedAt,
+        operator_click_count: activeJourney.operator_click_count + 1,
+        workflow_state: "executing",
+        updated_at: executeRequestedAt
+      });
+
+      persistWorkflowJourney(updatedJourney);
+      if (updatedJourney.evidence_origin === "guided_operator_capture") {
+        setGuidedCapture((currentState) => ({
+          ...currentState,
+          status: "in_progress",
+          message: createGuidedCaptureMessage({
+            armed: false,
+            captureLabel: updatedJourney.capture_label,
+            workflowRecord: updatedJourney
+          })
+        }));
+      }
     }
 
     setLastExecutionResponse(null);
@@ -637,15 +830,26 @@ export function JarvisApp() {
     const completedAt = new Date().toISOString();
     const latestJourney = workflowJourneyRef.current;
     if (latestJourney) {
-      persistWorkflowJourney(
-        mergeWorkflowProofRecord(latestJourney, {
-          run_id: executionResponse.run_id ?? latestJourney.run_id,
-          manifest_id: lastIntentResponse.manifest.manifest_id,
-          first_result_at: latestJourney.first_result_at ?? completedAt,
-          workflow_state: executionResponse.workflow_state,
-          updated_at: completedAt
-        })
-      );
+      const updatedJourney = mergeWorkflowProofRecord(latestJourney, {
+        run_id: executionResponse.run_id ?? latestJourney.run_id,
+        manifest_id: lastIntentResponse.manifest.manifest_id,
+        first_result_at: latestJourney.first_result_at ?? completedAt,
+        workflow_state: executionResponse.workflow_state,
+        updated_at: completedAt
+      });
+
+      persistWorkflowJourney(updatedJourney);
+      if (updatedJourney.evidence_origin === "guided_operator_capture") {
+        setGuidedCapture((currentState) => ({
+          ...currentState,
+          status: "completed",
+          message: createGuidedCaptureMessage({
+            armed: false,
+            captureLabel: updatedJourney.capture_label,
+            workflowRecord: updatedJourney
+          })
+        }));
+      }
     }
     await refreshRunHistory();
     await handleRecallSearch(recallQuery);
@@ -757,6 +961,14 @@ export function JarvisApp() {
             runEvents={runEvents}
             lastIntentResponse={lastIntentResponse}
             plannerStatus={plannerStatus}
+            guidedCapture={guidedCaptureProgress}
+            onGuidedCaptureLabelChange={(nextValue) => {
+              setGuidedCapture((currentState) => ({
+                ...currentState,
+                draftLabel: nextValue
+              }));
+            }}
+            onToggleGuidedCapture={handleToggleGuidedCapture}
           />
         );
     }

@@ -26,6 +26,21 @@ export interface CommandCenterPageProps {
   readonly runEvents: readonly RunEvent[];
   readonly lastIntentResponse: TaskIntentResponse | null;
   readonly plannerStatus: PlannerStatusResponse | null;
+  readonly guidedCapture: {
+    armed: boolean;
+    draftLabel: string;
+    activeLabel: string | null;
+    status: "idle" | "armed" | "in_progress" | "completed";
+    message: string;
+    previewRecorded: boolean;
+    plannerAssistanceUsed: boolean;
+    goldenRouteReady: boolean;
+    approvalRecorded: boolean;
+    reviewReady: boolean;
+    countsTowardGate: boolean;
+  };
+  readonly onGuidedCaptureLabelChange: (nextValue: string) => void;
+  readonly onToggleGuidedCapture: () => void;
 }
 
 const detailRailSections = [
@@ -58,7 +73,10 @@ export function CommandCenterPage(props: CommandCenterPageProps) {
     pendingApprovalActionId,
     executionResponse,
     runEvents,
-    plannerStatus
+    plannerStatus,
+    guidedCapture,
+    onGuidedCaptureLabelChange,
+    onToggleGuidedCapture
   } = props;
   const compiledActions = lastIntentResponse?.manifest?.compiled_actions ?? [];
   const approvalCount = compiledActions.filter((action) => action.requires_approval).length;
@@ -116,6 +134,56 @@ export function CommandCenterPage(props: CommandCenterPageProps) {
               lastIntentResponse?.message ??
               "No typed preview has been generated yet."}
           </span>
+        </div>
+        <div className="summary-grid capture-grid">
+          <article className="summary-card summary-card-wide">
+            <h3>Guided Evidence Capture</h3>
+            <p>
+              Arm a guided capture before the next natural-language planner-assisted golden edit
+              journey if you want that journey to count toward the proof gate.
+            </p>
+            <label className="settings-field" htmlFor="guided-capture-label">
+              <span>Capture label</span>
+              <input
+                id="guided-capture-label"
+                type="text"
+                value={guidedCapture.draftLabel}
+                onChange={(event) => onGuidedCaptureLabelChange(event.target.value)}
+                placeholder="planner-assisted-golden-edit"
+              />
+            </label>
+            <div className="action-row">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={onToggleGuidedCapture}
+              >
+                {guidedCapture.armed ? "Disarm guided capture" : "Arm guided capture"}
+              </button>
+            </div>
+            <p>{guidedCapture.message}</p>
+            <div className="summary-grid">
+              <article className="summary-card">
+                <h3>Capture Status</h3>
+                <p>{guidedCapture.status}</p>
+              </article>
+              <article className="summary-card">
+                <h3>Active Label</h3>
+                <p>{guidedCapture.activeLabel ?? "none"}</p>
+              </article>
+              <article className="summary-card">
+                <h3>Counts Toward Gate</h3>
+                <p>{guidedCapture.countsTowardGate ? "yes" : "no"}</p>
+              </article>
+            </div>
+            <div className="capture-checklist" aria-label="Guided capture checklist">
+              <p>Preview recorded: {guidedCapture.previewRecorded ? "yes" : "no"}</p>
+              <p>Planner assist used: {guidedCapture.plannerAssistanceUsed ? "yes" : "no"}</p>
+              <p>Golden edit route: {guidedCapture.goldenRouteReady ? "yes" : "no"}</p>
+              <p>Approval recorded: {guidedCapture.approvalRecorded ? "yes" : "no"}</p>
+              <p>Review ready: {guidedCapture.reviewReady ? "yes" : "no"}</p>
+            </div>
+          </article>
         </div>
       </section>
 

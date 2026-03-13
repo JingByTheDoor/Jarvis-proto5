@@ -304,6 +304,8 @@ describe("Phase 6 renderer shell", () => {
     expect(screen.getByLabelText(/task composer \/ input/i)).toBeDefined();
     expect(screen.getByRole("button", { name: "Preview" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Execute" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Arm guided capture" })).toBeDefined();
+    expect(screen.getByDisplayValue("planner-assisted-golden-edit")).toBeDefined();
     expect(screen.getByText("Task Level")).toBeDefined();
     expect(screen.getByText("Task Type")).toBeDefined();
     expect(screen.getByText("Risk Class")).toBeDefined();
@@ -378,6 +380,7 @@ describe("Phase 6 renderer shell", () => {
     expect(screen.getByDisplayValue("http://127.0.0.1:11434")).toBeDefined();
     expect(screen.getByText(/1 of 1 golden workflow attempt\(s\) reached review_ready/i)).toBeDefined();
     expect(screen.getByText(/Status: collecting evidence/i)).toBeDefined();
+    expect(screen.getByText(/Gate evaluation currently uses guided operator captures only/i)).toBeDefined();
     expect(screen.getByText(/\.tmp\/runs: 30 days \| \.tmp\/logs: 7 days/i)).toBeDefined();
     expect(screen.getByText(/\.tmp\/cache: 3 days \| sensitive session cache: 24 hours/i)).toBeDefined();
     expect(screen.getByText(/Run exports are staged under encrypted-at-rest local storage/i)).toBeDefined();
@@ -434,6 +437,42 @@ describe("Phase 6 renderer shell", () => {
         workspace_root: "D:\\Jarvis-proto5 repo\\Jarvis-proto5",
         run_id: "run-1"
       });
+    },
+    15000
+  );
+
+  it(
+    "tags the next planner-assisted golden edit journey when guided capture is armed",
+    async () => {
+      const desktopApi = createEditDesktopApiStub();
+      window.jarvisDesktop = desktopApi;
+
+      render(<JarvisApp />);
+
+      await screen.findByText("phase-6-planner-assist");
+      fireEvent.click(screen.getByRole("button", { name: "Arm guided capture" }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Armed guided capture "planner-assisted-golden-edit"/i)).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Capture "planner-assisted-golden-edit" is gate-eligible so far/i)).toBeDefined();
+      });
+
+      expect(desktopApi.recordWorkflowProof).toHaveBeenCalled();
+      expect(
+        (desktopApi.recordWorkflowProof as ReturnType<typeof vi.fn>).mock.calls.some(
+          ([payload]) =>
+            payload.evidence_origin === "guided_operator_capture" &&
+            payload.capture_label === "planner-assisted-golden-edit" &&
+            payload.planner_assistance_used === true &&
+            payload.counts_toward_gate === true
+        )
+      ).toBe(true);
+      expect(screen.getByText("yes")).toBeDefined();
     },
     15000
   );

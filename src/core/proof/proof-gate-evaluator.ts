@@ -10,7 +10,7 @@ const maximumRecentMedianWorkflowSteps = 4;
 const maximumRecentMedianOperatorClicks = 5;
 
 const proofGateAssumptionNote =
-  "Assumption: candidate_ready requires at least 3 recent golden edit journeys, 1 resumed review_ready journey, 6 qualifying samples for trend checks, resumed task-to-preview speed no worse than the overall golden-workflow median, and recent medians at or below 4 workflow steps and 5 operator clicks.";
+  "Assumption: proof-gate evaluation uses guided operator captures only. Candidate_ready requires at least 3 recent golden edit journeys, 1 resumed review_ready journey, 6 qualifying samples for trend checks, resumed task-to-preview speed no worse than the overall golden-workflow median, and recent medians at or below 4 workflow steps and 5 operator clicks.";
 
 type WorkflowProofGateCriterion = WorkflowProofGateStatus["stability"];
 type WorkflowProofGateCriterionInput = Pick<

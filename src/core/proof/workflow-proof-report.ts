@@ -79,7 +79,10 @@ function renderCriterionSection(
 
 function renderRecentJourneys(journeys: readonly WorkflowProofRecord[]): string[] {
   if (journeys.length === 0) {
-    return ["## Recent Journeys", "- No local proof journeys have been recorded yet."];
+    return [
+      "## Recent Journeys",
+      "- No guided proof journeys have been recorded yet."
+    ];
   }
 
   const lines = ["## Recent Journeys"];
@@ -87,6 +90,10 @@ function renderRecentJourneys(journeys: readonly WorkflowProofRecord[]): string[
   for (const journey of journeys) {
     lines.push(`### ${journey.journey_id}`);
     lines.push(`- Kind: ${journey.journey_kind}`);
+    lines.push(`- Evidence source: ${journey.evidence_origin}`);
+    lines.push(`- Capture label: ${journey.capture_label ?? "none"}`);
+    lines.push(`- Counts toward gate: ${journey.counts_toward_gate ? "yes" : "no"}`);
+    lines.push(`- Planner assist used: ${journey.planner_assistance_used ? "yes" : "no"}`);
     lines.push(`- State: ${journey.workflow_state ?? "collecting"}`);
     lines.push(`- Route: ${journey.route_kind ?? "pending"}`);
     lines.push(`- Resume used: ${journey.resume_used ? "yes" : "no"}`);
@@ -108,6 +115,7 @@ export function createWorkflowProofReport(
     `- Generated at: ${generated_at}`,
     `- Workspace: ${workspace_root}`,
     `- Overall gate: ${gate_status.overall_status}`,
+    "- Evidence policy: guided operator captures only",
     "",
     "## Summary",
     `- Golden workflow review_ready: ${summary.golden_workflow_review_ready} / ${summary.golden_workflow_attempts}`,

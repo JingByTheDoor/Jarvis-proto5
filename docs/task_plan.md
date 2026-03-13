@@ -2,7 +2,7 @@
 
 ## Current Focus
 
-- Phase 6 Slice G: add per-run delete/export controls and explicit retention visibility without broadening advanced routing or optional systems.
+- Phase 6 Slice H: add guided operator evidence capture so real planner-assisted golden-workflow journeys can count cleanly toward the proof gate.
 
 ## Scope
 
@@ -14,6 +14,7 @@
 - Add one optional local planner adapter that can normalize natural-language tasks into the existing supported v1 typed routes while leaving deterministic compile, simulation, approval, execution, attestation, and review in control.
 - Surface planner/provider health, null-adapter behavior, and session-local provider/model selection in Connections, Settings, and the Command Center.
 - Add typed per-run delete/export controls for persisted run review data and make retention plus sensitive-session defaults explicit in Settings.
+- Add a guided evidence-capture mode that tags real planner-assisted golden-workflow journeys and keeps background measurements out of the gate by default.
 - Keep advanced routing, durable memory, challenger logic, and optional adapters blocked behind the proof gate from the master sheet.
 
 ## Explicit Deferrals
@@ -108,3 +109,9 @@
 - Tasks & Projects now exposes typed per-run export and delete controls so persisted review state can be staged for export or removed without broadening routing or execution authority.
 - Run exports are sanitized and staged under encrypted-at-rest local storage before any later out-of-app export path is considered; no plaintext export cache is introduced in this slice.
 - Settings now shows the default retention TTLs plus sensitive-session defaults explicitly, which keeps local review-data posture inspectable while the proof gate is still open.
+
+## Phase 6 Slice H Notes
+
+- The Command Center now supports guided operator evidence capture so the next real planner-assisted golden edit journey can be armed, labeled, and tracked step by step.
+- Workflow-proof storage still keeps background measurements locally, but the proof gate now evaluates guided captures only; this keeps noisy incidental runs from inflating or corrupting gate evidence.
+- Guided capture favors natural-language planner-assisted journeys on the golden edit route, which makes the proof gate better aligned with the product-value question from the master sheet.

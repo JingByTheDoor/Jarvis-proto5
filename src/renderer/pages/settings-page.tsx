@@ -149,6 +149,7 @@ export function SettingsPage(props: SettingsPageProps) {
               ? `${summary.golden_workflow_review_ready} of ${summary.golden_workflow_attempts} golden workflow attempt(s) reached review_ready.`
               : "Golden workflow stability will appear after the first local proof samples land."}
           </p>
+          <p>Gate evaluation currently uses guided operator captures only.</p>
         </article>
         <article className="summary-card">
           <h3>Latency</h3>
