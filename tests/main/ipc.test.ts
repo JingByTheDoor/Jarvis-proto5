@@ -8,6 +8,7 @@ import { EncryptedWorkflowProofStore } from "../../src/core/proof/workflow-proof
 import type { EncryptedAtRestProvider } from "../../src/core/persistence/encrypted-at-rest";
 import {
   handleApprovalDecisionSubmit,
+  handlePolicySnapshotRequest,
   handleTaskIntentSubmit,
   handleWorkflowProofRecord,
   handleWorkflowProofSummaryRequest
@@ -183,9 +184,26 @@ describe("main IPC approval flow", () => {
       expect(recorded.workspace_root).toBe(repo.root);
       expect(summary.summary.golden_workflow_attempts).toBe(1);
       expect(summary.summary.golden_workflow_review_ready).toBe(1);
+      expect(summary.gate_status.overall_status).toBe("collecting_evidence");
       expect(summary.recent_journeys[0]?.journey_id).toBe(recorded.journey_id);
     } finally {
       repo.cleanup();
     }
+  });
+
+  it("returns the app startup timestamp in the policy snapshot", () => {
+    const response = handlePolicySnapshotRequest(
+      trustedEvent,
+      {
+        session_id: "phase-6-proof-gate"
+      },
+      {
+        now: () => ISO_LATER,
+        appStartedAt: "2026-03-11T17:59:59.500Z"
+      }
+    );
+
+    expect(response.version).toBe("phase-6-proof-gate");
+    expect(response.app_started_at).toBe("2026-03-11T17:59:59.500Z");
   });
 });

@@ -15,6 +15,7 @@ import type { JarvisDesktopApi } from "../../src/shared/desktop-api";
 import { workflowSequence } from "../../src/shared/constants";
 import {
   validApprovalDecisionResponse,
+  ISO_APP_STARTED,
   validRecallSearchResponse,
   validRunEvent,
   validRunExecutionResponse,
@@ -31,7 +32,8 @@ function createDesktopApiStub(): JarvisDesktopApi {
     version: "phase-6-proof-gate",
     workflow: workflowSequence,
     local_first: true as const,
-    approval_required_for_risky_actions: true as const
+    approval_required_for_risky_actions: true as const,
+    app_started_at: ISO_APP_STARTED
   })) as unknown as JarvisDesktopApi["getPolicySnapshot"];
 
   return {
@@ -174,7 +176,8 @@ function createEditDesktopApiStub(): JarvisDesktopApi {
       version: "phase-6-proof-gate",
       workflow: workflowSequence,
       local_first: true as const,
-      approval_required_for_risky_actions: true as const
+      approval_required_for_risky_actions: true as const,
+      app_started_at: ISO_APP_STARTED
     })) as unknown as JarvisDesktopApi["getPolicySnapshot"],
     subscribeToRunEvents: vi.fn(() => () => {})
   };
@@ -211,7 +214,8 @@ function createExecutingDesktopApiStub(): JarvisDesktopApi {
       version: "phase-6-proof-gate",
       workflow: workflowSequence,
       local_first: true as const,
-      approval_required_for_risky_actions: true as const
+      approval_required_for_risky_actions: true as const,
+      app_started_at: ISO_APP_STARTED
     })) as unknown as JarvisDesktopApi["getPolicySnapshot"],
     subscribeToRunEvents: vi.fn((listener) => {
       runEventListener = listener as unknown as typeof runEventListener;
@@ -309,6 +313,13 @@ describe("Phase 6 renderer shell", () => {
       screen.getByRole("heading", { name: /retention, approval, and session posture stay explicit/i })
     ).toBeDefined();
     expect(screen.getByText(/1 of 1 golden workflow attempt\(s\) reached review_ready/i)).toBeDefined();
+    expect(screen.getByText(/Status: collecting evidence/i)).toBeDefined();
+    expect(screen.getByText(/Cold start -> composer median: 500 ms/i)).toBeDefined();
+    expect(screen.getByText(/Preview -> approval median: 2000 ms/i)).toBeDefined();
+    expect(screen.getByText(/Repeat task -> preview median: 1000 ms/i)).toBeDefined();
+    expect(screen.getByText(/Review-ready in window: 1 \/ 3/i)).toBeDefined();
+    expect(screen.getByText(/Resumed samples: 1 \/ 1/i)).toBeDefined();
+    expect(screen.getByText(/At least one resumed journey reached review_ready/i)).toBeDefined();
     },
     15000
   );

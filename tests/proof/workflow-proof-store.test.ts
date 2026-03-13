@@ -86,7 +86,11 @@ describe("workflow proof store", () => {
       expect(summarySnapshot.summary.golden_workflow_attempts).toBe(2);
       expect(summarySnapshot.summary.golden_workflow_review_ready).toBe(1);
       expect(summarySnapshot.summary.golden_workflow_stability_rate).toBe(0.5);
+      expect(summarySnapshot.summary.median_cold_start_to_composer_ms).toBe(500);
+      expect(summarySnapshot.summary.median_preview_to_approval_ms).toBe(2000);
+      expect(summarySnapshot.summary.median_repeat_task_to_preview_ms).toBe(1000);
       expect(summarySnapshot.summary.resume_journeys).toBe(2);
+      expect(summarySnapshot.gate_status.overall_status).toBe("collecting_evidence");
       expect(summarySnapshot.recent_journeys[0]?.journey_id).toBe("journey-inspect-1");
     } finally {
       repo.cleanup();

@@ -48,6 +48,7 @@ export interface IpcMainLike {
 
 export interface ShellIpcOptions {
   readonly now: () => string;
+  readonly appStartedAt?: string;
   readonly approvalRegistry?: ApprovalRegistry;
   readonly capabilityTokenStore?: CapabilityTokenStore;
   readonly runLogStore?: RunLogStore;
@@ -77,7 +78,7 @@ export function handleTaskIntentSubmit(
 export function handlePolicySnapshotRequest(
   event: IpcSenderEventLike,
   payload: unknown,
-  _options: ShellIpcOptions
+  options: ShellIpcOptions
 ): PolicySnapshotResponse {
   assertTrustedSenderFrame(event);
   PolicySnapshotRequestSchema.parse(payload);
@@ -86,7 +87,8 @@ export function handlePolicySnapshotRequest(
     version: "phase-6-proof-gate",
     workflow: workflowSequence,
     local_first: true,
-    approval_required_for_risky_actions: true
+    approval_required_for_risky_actions: true,
+    app_started_at: options.appStartedAt ?? options.now()
   });
 }
 

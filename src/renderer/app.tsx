@@ -159,6 +159,8 @@ function createWorkflowProofRecord(input: {
   readonly journeyId: string;
   readonly sessionId: string;
   readonly workspaceRoot: string;
+  readonly composerReadyAt: string | null;
+  readonly coldStartToComposerMs: number | null;
   readonly previewRequestedAt: string;
   readonly resumeUsed: boolean;
   readonly resumedFromRecallId: string | null;
@@ -174,10 +176,13 @@ function createWorkflowProofRecord(input: {
     approval_required: false,
     resume_used: input.resumeUsed,
     resumed_from_recall_id: input.resumedFromRecallId,
+    composer_ready_at: input.composerReadyAt,
+    cold_start_to_composer_ms: input.coldStartToComposerMs,
     preview_requested_at: input.previewRequestedAt,
     preview_ready_at: null,
     task_to_preview_ms: null,
     approval_recorded_at: null,
+    preview_to_approval_ms: null,
     execute_requested_at: null,
     first_result_at: null,
     approval_to_first_result_ms: null,
@@ -203,6 +208,10 @@ function mergeWorkflowProofRecord(
   nextRecord.approval_to_first_result_ms = diffMilliseconds(
     nextRecord.approval_recorded_at,
     nextRecord.first_result_at
+  );
+  nextRecord.preview_to_approval_ms = diffMilliseconds(
+    nextRecord.preview_ready_at,
+    nextRecord.approval_recorded_at
   );
   nextRecord.execute_to_first_result_ms = diffMilliseconds(
     nextRecord.execute_requested_at,
@@ -242,6 +251,7 @@ export function JarvisApp() {
   const [pendingResumeRecallId, setPendingResumeRecallId] = useState<string | null>(null);
   const [isDetailsRailOpen, setIsDetailsRailOpen] = useState(false);
   const workflowJourneyRef = useRef<WorkflowProofRecord | null>(null);
+  const composerReadyAtRef = useRef<string>(new Date().toISOString());
   const deferredComposerValue = useDeferredValue(composerValue);
   const pendingApprovalRequests = lastIntentResponse?.approval_requests ?? [];
   const canExecute =
@@ -367,6 +377,11 @@ export function JarvisApp() {
       journeyId: createWorkflowJourneyId(),
       sessionId: SESSION_ID,
       workspaceRoot: WORKSPACE_ROOT,
+      composerReadyAt: composerReadyAtRef.current,
+      coldStartToComposerMs: diffMilliseconds(
+        policySnapshot?.app_started_at ?? null,
+        composerReadyAtRef.current
+      ),
       previewRequestedAt,
       resumeUsed: pendingResumeRecallId !== null,
       resumedFromRecallId: pendingResumeRecallId

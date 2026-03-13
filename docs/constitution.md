@@ -287,9 +287,12 @@ Phase 6 starts with local workflow-proof measurement before broader expansion.
 Rules:
 
 - Workflow-proof records are first-party local operational evidence, not optional Tier 3 analytics.
-- Workflow-proof records may store route, workflow state, timestamps, manifest/run ids, resume usage, and step/click counts only.
+- Workflow-proof records may store route, workflow state, speed-gate timestamps and durations, manifest/run ids, resume usage, and step/click counts only.
 - Raw task text, secrets, and provider credentials never enter workflow-proof storage.
 - Workflow-proof records remain encrypted at rest under the local cache storage class.
+- Proof-gate evaluation remains conservative and local-only: `candidate_ready` is allowed only after enough recent golden-workflow evidence exists, recent latency trends do not regress, recent workflow-step and click medians stay below the local proof thresholds, and at least one resumed journey reaches `review_ready`.
+- The local proof gate must explicitly track cold start to usable composer, task to preview, preview to approval, approval to visible first result, steps/clicks, and repeat-task speed with context reuse before broader expansion opens.
+- Every proof-gate criterion must remain inspectable: sample windows, required counts, success counts, recent/previous medians, and threshold medians belong in typed local proof data rather than being implied only through prose.
 - Advanced routing, durable memory, challenger logic, Tier 2 memory, Tier 3 analytics, and optional providers remain blocked until the local proof gate shows the golden workflow is stable and low-friction.
 
 ## Naming Conventions

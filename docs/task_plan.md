@@ -2,14 +2,15 @@
 
 ## Current Focus
 
-- Phase 6 Slice A: local proof-gate measurement for the golden workflow.
+- Phase 6 Slice D: make local proof-gate evidence windows inspectable.
 
 ## Scope
 
 - Persist local workflow-proof records for the golden workflow under encrypted local storage.
 - Track task-to-preview latency, approval-to-first-result latency, execute-to-first-result latency, and operator steps/clicks.
+- Track cold start to usable composer, preview-to-approval latency, and repeat-task speed with context reuse in the same local proof records.
 - Track whether resume-from-recall is being used and whether resumed journeys reach `review_ready`.
-- Surface proof-gate summary data in the UI without broadening routing, memory tiers, or optional providers.
+- Surface proof-gate summary data, criterion evidence windows, and a conservative local gate verdict in the UI without broadening routing, memory tiers, or optional providers.
 - Keep advanced routing, durable memory, challenger logic, and optional adapters blocked behind the proof gate from the master sheet.
 
 ## Explicit Deferrals
@@ -68,3 +69,21 @@
 - Workflow-proof records now persist locally with encrypted-at-rest storage so the current golden workflow can be measured before broader expansion.
 - The app now tracks task-to-preview latency, approval-to-first-result latency, execute-to-first-result latency, operator steps/clicks, and resume usage for local proof only.
 - Settings now shows the current proof-gate summary and recent local proof samples, while advanced routing and optional systems remain deferred.
+
+## Phase 6 Slice B Notes
+
+- The proof gate now evaluates local evidence into `collecting_evidence`, `blocked`, or `candidate_ready` instead of leaving the operator to infer readiness manually.
+- Assumption: `candidate_ready` requires at least 3 recent golden edit journeys, 1 resumed `review_ready` journey, and 6 qualifying samples for trend checks; recent medians must stay at or below 4 workflow steps and 5 operator clicks.
+- Advanced routing, durable memory, challenger logic, and optional providers remain blocked until the local gate reaches `candidate_ready` with real operator journeys.
+
+## Phase 6 Slice C Notes
+
+- The proof gate now tracks the remaining required speed gates from the master sheet: cold start to usable composer, preview-to-approval latency, and repeat-task speed with context reuse.
+- Assumption: cold start to usable composer is measured from the main-process startup timestamp to the first renderer composer-ready timestamp, and repeat-task speed is currently evaluated by comparing resumed task-to-preview latency against the overall golden-workflow median.
+- Broader routing, memory, challenger, and optional-provider work remain blocked until these speed gates are populated by real local journeys instead of fixtures.
+
+## Phase 6 Slice D Notes
+
+- Proof-gate criteria now carry typed sample counts, required counts, success counts, recent/previous medians, and threshold medians so blocked readiness can be inspected numerically.
+- The Settings proof section now acts as a local evidence board rather than a prose-only verdict, which keeps the proof gate legible while broader expansion remains blocked.
+- No routing, memory-tier, challenger, or optional-provider broadening is allowed until these inspectable criteria are satisfied by real local journeys.

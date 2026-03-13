@@ -17,6 +17,7 @@ import {
   ToolResultSchema,
   VerificationStatusSchema,
   WorkflowProofRecordSchema,
+  WorkflowProofGateStatusSchema,
   WorkflowProofSummarySchema,
   WorkflowStateSchema
 } from "../core/schemas";
@@ -138,7 +139,8 @@ export const PolicySnapshotResponseSchema = z
     version: z.string().min(1),
     workflow: z.literal(workflowSequence),
     local_first: z.literal(true),
-    approval_required_for_risky_actions: z.literal(true)
+    approval_required_for_risky_actions: z.literal(true),
+    app_started_at: z.string().datetime({ offset: true })
   })
   .strict();
 
@@ -214,6 +216,7 @@ export const WorkflowProofSummaryRequestSchema = z
 export const WorkflowProofSummaryResponseSchema = z
   .object({
     summary: WorkflowProofSummarySchema,
+    gate_status: WorkflowProofGateStatusSchema,
     recent_journeys: z.array(WorkflowProofRecordSchema)
   })
   .strict();

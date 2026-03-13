@@ -16,6 +16,8 @@ import {
   networkSchemes,
   persistenceStatuses,
   previewConfidenceLevels,
+  proofGateCriterionStatuses,
+  proofGateOverallStatuses,
   provenanceTypes,
   riskLevels,
   routeKinds,
@@ -59,6 +61,8 @@ export const NetworkAccessClassSchema = z.enum(networkAccessClasses);
 export const RouteKindSchema = z.enum(routeKinds);
 export const TaskTypeSchema = z.enum(taskTypes);
 export const WorkflowJourneyKindSchema = z.enum(workflowJourneyKinds);
+export const ProofGateCriterionStatusSchema = z.enum(proofGateCriterionStatuses);
+export const ProofGateOverallStatusSchema = z.enum(proofGateOverallStatuses);
 
 export const NetworkScopeRuleSchema = z
   .object({
@@ -315,10 +319,13 @@ export const WorkflowProofRecordSchema = z
     approval_required: z.boolean(),
     resume_used: z.boolean(),
     resumed_from_recall_id: z.string().min(1).nullable(),
+    composer_ready_at: IsoDateTimeSchema.nullable(),
+    cold_start_to_composer_ms: z.number().int().min(0).nullable(),
     preview_requested_at: IsoDateTimeSchema,
     preview_ready_at: IsoDateTimeSchema.nullable(),
     task_to_preview_ms: z.number().int().min(0).nullable(),
     approval_recorded_at: IsoDateTimeSchema.nullable(),
+    preview_to_approval_ms: z.number().int().min(0).nullable(),
     execute_requested_at: IsoDateTimeSchema.nullable(),
     first_result_at: IsoDateTimeSchema.nullable(),
     approval_to_first_result_ms: z.number().int().min(0).nullable(),
@@ -337,14 +344,47 @@ export const WorkflowProofSummarySchema = z
     golden_workflow_attempts: z.number().int().min(0),
     golden_workflow_review_ready: z.number().int().min(0),
     golden_workflow_stability_rate: z.number().min(0).max(1),
+    median_cold_start_to_composer_ms: z.number().int().min(0).nullable(),
     median_task_to_preview_ms: z.number().int().min(0).nullable(),
+    median_preview_to_approval_ms: z.number().int().min(0).nullable(),
     median_approval_to_first_result_ms: z.number().int().min(0).nullable(),
     median_execute_to_first_result_ms: z.number().int().min(0).nullable(),
     median_workflow_step_count: z.number().int().min(0).nullable(),
     median_operator_click_count: z.number().int().min(0).nullable(),
+    median_repeat_task_to_preview_ms: z.number().int().min(0).nullable(),
     resume_journeys: z.number().int().min(0),
     resume_review_ready: z.number().int().min(0),
     latest_updated_at: IsoDateTimeSchema.nullable()
+  })
+  .strict();
+
+export const WorkflowProofGateCriterionSchema = z
+  .object({
+    status: ProofGateCriterionStatusSchema,
+    detail: z.string().min(1),
+    sample_count: z.number().int().min(0).nullable(),
+    required_sample_count: z.number().int().min(1).nullable(),
+    satisfied_count: z.number().int().min(0).nullable(),
+    required_satisfied_count: z.number().int().min(1).nullable(),
+    recent_median: z.number().int().min(0).nullable(),
+    previous_median: z.number().int().min(0).nullable(),
+    threshold_median: z.number().int().min(0).nullable()
+  })
+  .strict();
+
+export const WorkflowProofGateStatusSchema = z
+  .object({
+    overall_status: ProofGateOverallStatusSchema,
+    blocking_reasons: z.array(z.string()),
+    stability: WorkflowProofGateCriterionSchema,
+    task_to_preview_trend: WorkflowProofGateCriterionSchema,
+    preview_to_approval_trend: WorkflowProofGateCriterionSchema,
+    approval_to_first_result_trend: WorkflowProofGateCriterionSchema,
+    step_count_trend: WorkflowProofGateCriterionSchema,
+    click_count_trend: WorkflowProofGateCriterionSchema,
+    repeat_task_speed: WorkflowProofGateCriterionSchema,
+    resume_helpfulness: WorkflowProofGateCriterionSchema,
+    assumption_note: z.string().min(1)
   })
   .strict();
 
@@ -369,3 +409,4 @@ export type MemoryMetadata = z.infer<typeof MemoryMetadataSchema>;
 export type MemoryRecord = z.infer<typeof MemoryRecordSchema>;
 export type WorkflowProofRecord = z.infer<typeof WorkflowProofRecordSchema>;
 export type WorkflowProofSummary = z.infer<typeof WorkflowProofSummarySchema>;
+export type WorkflowProofGateStatus = z.infer<typeof WorkflowProofGateStatusSchema>;

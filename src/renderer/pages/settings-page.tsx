@@ -5,14 +5,97 @@ export interface SettingsPageProps {
   readonly proofError: string | null;
 }
 
+type WorkflowProofGateCriterion = WorkflowProofSummaryResponse["gate_status"]["stability"];
+
 function formatMetric(value: number | null, suffix: string): string {
   return value === null ? `Not enough local data yet` : `${value}${suffix}`;
+}
+
+function formatStatusLabel(value: string): string {
+  return value.replaceAll("_", " ");
+}
+
+function formatCountLine(
+  label: string,
+  observedCount: number | null | undefined,
+  requiredCount: number | null | undefined
+): string | null {
+  if (typeof observedCount !== "number" || typeof requiredCount !== "number") {
+    return null;
+  }
+
+  return `${label}: ${observedCount} / ${requiredCount}`;
+}
+
+function formatMedianLine(criterion: WorkflowProofGateCriterion): string | null {
+  const medianSegments: string[] = [];
+
+  if (typeof criterion.recent_median === "number") {
+    medianSegments.push(`Recent median: ${criterion.recent_median} ms`);
+  }
+
+  if (typeof criterion.previous_median === "number") {
+    medianSegments.push(`Previous median: ${criterion.previous_median} ms`);
+  }
+
+  if (typeof criterion.threshold_median === "number") {
+    medianSegments.push(`Threshold: <= ${criterion.threshold_median}`);
+  }
+
+  return medianSegments.length > 0 ? medianSegments.join(" | ") : null;
 }
 
 export function SettingsPage(props: SettingsPageProps) {
   const { proofSummary, proofError } = props;
   const summary = proofSummary?.summary ?? null;
+  const gateStatus = proofSummary?.gate_status ?? null;
   const recentJourneys = proofSummary?.recent_journeys ?? [];
+  const criterionCards = gateStatus
+    ? [
+        {
+          label: "Stability",
+          criterion: gateStatus.stability,
+          sampleLabel: "Window samples",
+          satisfiedLabel: "Review-ready in window"
+        },
+        {
+          label: "Task -> Preview",
+          criterion: gateStatus.task_to_preview_trend,
+          sampleLabel: "Trend samples"
+        },
+        {
+          label: "Preview -> Approval",
+          criterion: gateStatus.preview_to_approval_trend,
+          sampleLabel: "Trend samples"
+        },
+        {
+          label: "Approval -> First Result",
+          criterion: gateStatus.approval_to_first_result_trend,
+          sampleLabel: "Trend samples"
+        },
+        {
+          label: "Workflow Steps",
+          criterion: gateStatus.step_count_trend,
+          sampleLabel: "Trend samples"
+        },
+        {
+          label: "Operator Clicks",
+          criterion: gateStatus.click_count_trend,
+          sampleLabel: "Trend samples"
+        },
+        {
+          label: "Repeat-task Speed",
+          criterion: gateStatus.repeat_task_speed,
+          sampleLabel: "Resumed samples"
+        },
+        {
+          label: "Resume Helpfulness",
+          criterion: gateStatus.resume_helpfulness,
+          sampleLabel: "Resumed journeys",
+          satisfiedLabel: "Review-ready resumed journeys"
+        }
+      ]
+    : [];
 
   return (
     <section className="page-section" aria-labelledby="settings-title">
@@ -24,14 +107,27 @@ export function SettingsPage(props: SettingsPageProps) {
         <article className="summary-card">
           <h3>Phase 6 Proof Gate</h3>
           <p>
+            {gateStatus
+              ? `Status: ${formatStatusLabel(gateStatus.overall_status)}.`
+              : "Local proof remains empty until the workflow runs through preview and review."}
+          </p>
+          <p>
             {summary
               ? `${summary.golden_workflow_review_ready} of ${summary.golden_workflow_attempts} golden workflow attempt(s) reached review_ready.`
-              : "Local proof remains empty until the workflow runs through preview and review."}
+              : "Golden workflow stability will appear after the first local proof samples land."}
           </p>
         </article>
         <article className="summary-card">
           <h3>Latency</h3>
+          <p>
+            Cold start {"->"} composer median:{" "}
+            {formatMetric(summary?.median_cold_start_to_composer_ms ?? null, " ms")}
+          </p>
           <p>Task {"->"} preview median: {formatMetric(summary?.median_task_to_preview_ms ?? null, " ms")}</p>
+          <p>
+            Preview {"->"} approval median:{" "}
+            {formatMetric(summary?.median_preview_to_approval_ms ?? null, " ms")}
+          </p>
           <p>
             Approval {"->"} first result median: {formatMetric(summary?.median_approval_to_first_result_ms ?? null, " ms")}
           </p>
@@ -48,9 +144,67 @@ export function SettingsPage(props: SettingsPageProps) {
               ? `${summary.resume_review_ready} of ${summary.resume_journeys} resumed journey/journeys reached review_ready.`
               : "Resume usefulness will appear after local recall is used in the golden workflow."}
           </p>
+          <p>
+            Repeat task {"->"} preview median:{" "}
+            {formatMetric(summary?.median_repeat_task_to_preview_ms ?? null, " ms")}
+          </p>
         </article>
       </div>
       <div className="summary-grid">
+        {criterionCards.length > 0 ? (
+          criterionCards.map((item) => (
+            <article className="summary-card" key={item.label}>
+              <h3>{item.label}</h3>
+              <p>Status: {formatStatusLabel(item.criterion.status)}</p>
+              <p>{item.criterion.detail}</p>
+              {formatCountLine(
+                item.sampleLabel,
+                item.criterion.sample_count,
+                item.criterion.required_sample_count
+              ) ? (
+                <p>
+                  {formatCountLine(
+                    item.sampleLabel,
+                    item.criterion.sample_count,
+                    item.criterion.required_sample_count
+                  )}
+                </p>
+              ) : null}
+              {item.satisfiedLabel &&
+              formatCountLine(
+                item.satisfiedLabel,
+                item.criterion.satisfied_count,
+                item.criterion.required_satisfied_count
+              ) ? (
+                <p>
+                  {formatCountLine(
+                    item.satisfiedLabel,
+                    item.criterion.satisfied_count,
+                    item.criterion.required_satisfied_count
+                  )}
+                </p>
+              ) : null}
+              {formatMedianLine(item.criterion) ? <p>{formatMedianLine(item.criterion)}</p> : null}
+            </article>
+          ))
+        ) : (
+          <article className="summary-card summary-card-wide">
+            <h3>Proof Gate Criteria</h3>
+            <p>Local proof details will appear once a proof summary is available.</p>
+          </article>
+        )}
+        <article className="summary-card summary-card-wide">
+          <h3>Blocking Reasons</h3>
+          <p>
+            {(gateStatus?.blocking_reasons.length ?? 0) > 0
+              ? gateStatus?.blocking_reasons.join(" ")
+              : "No blocking reasons are recorded once every local proof criterion is on track."}
+          </p>
+          <p>
+            {gateStatus?.assumption_note ??
+              "Assumptions stay explicit whenever the local proof gate adds conservative readiness thresholds."}
+          </p>
+        </article>
         {recentJourneys.length > 0 ? (
           recentJourneys.map((journey) => (
             <article className="summary-card" key={journey.journey_id}>

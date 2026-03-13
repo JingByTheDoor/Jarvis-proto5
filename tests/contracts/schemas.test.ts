@@ -12,6 +12,7 @@ import {
   validRunEvent,
   validRunLog,
   validToolResult,
+  validWorkflowProofGateStatus,
   validWorkflowProofRecord,
   validWorkflowProofSummaryResponse
 } from "../fixtures";
@@ -39,7 +40,8 @@ const examples = {
   EXECUTION_ATTESTATION: validExecutionAttestation,
   MEMORY_RECORD: validMemoryRecord,
   WORKFLOW_PROOF_RECORD: validWorkflowProofRecord,
-  WORKFLOW_PROOF_SUMMARY: validWorkflowProofSummaryResponse.summary
+  WORKFLOW_PROOF_SUMMARY: validWorkflowProofSummaryResponse.summary,
+  WORKFLOW_PROOF_GATE_STATUS: validWorkflowProofGateStatus
 } as const;
 
 const invalidExamples = {
@@ -109,6 +111,10 @@ const invalidExamples = {
   WORKFLOW_PROOF_SUMMARY: {
     ...validWorkflowProofSummaryResponse.summary,
     golden_workflow_stability_rate: 2
+  },
+  WORKFLOW_PROOF_GATE_STATUS: {
+    ...validWorkflowProofGateStatus,
+    overall_status: "ready"
   }
 } as const;
 
@@ -127,7 +133,8 @@ describe("schema registry", () => {
       "EXECUTION_ATTESTATION",
       "MEMORY_RECORD",
       "WORKFLOW_PROOF_RECORD",
-      "WORKFLOW_PROOF_SUMMARY"
+      "WORKFLOW_PROOF_SUMMARY",
+      "WORKFLOW_PROOF_GATE_STATUS"
     ]);
   });
 

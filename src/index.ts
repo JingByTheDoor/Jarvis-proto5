@@ -12,6 +12,7 @@ export * from "./core/execution/manifest-executor";
 export * from "./core/memory/basic-recall";
 export * from "./core/persistence/encrypted-at-rest";
 export * from "./core/planning/untrusted-content";
+export * from "./core/proof/proof-gate-evaluator";
 export * from "./core/proof/workflow-proof-store";
 export * from "./core/redaction/redactor";
 export * from "./core/schemas";

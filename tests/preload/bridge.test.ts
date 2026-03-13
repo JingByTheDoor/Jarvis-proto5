@@ -4,6 +4,7 @@ import { createJarvisDesktopApi } from "../../src/preload/bridge";
 import {
   validApprovalDecision,
   validApprovalDecisionResponse,
+  validPolicySnapshotResponseEnvelope,
   validRecallSearchResponse,
   validRunExecutionResponse,
   validRunEvent,
@@ -114,7 +115,8 @@ describe("preload bridge", () => {
         .mockResolvedValueOnce(validRunHistoryResponse)
         .mockResolvedValueOnce(validRecallSearchResponse)
         .mockResolvedValueOnce(validWorkflowProofRecord)
-        .mockResolvedValueOnce(validWorkflowProofSummaryResponse),
+        .mockResolvedValueOnce(validWorkflowProofSummaryResponse)
+        .mockResolvedValueOnce(validPolicySnapshotResponseEnvelope.payload),
       send: vi.fn(),
       on: vi.fn(),
       removeListener: vi.fn()
@@ -153,5 +155,11 @@ describe("preload bridge", () => {
         limit: 5
       })
     ).resolves.toEqual(validWorkflowProofSummaryResponse);
+
+    await expect(
+      desktopApi.getPolicySnapshot({
+        session_id: "session-1"
+      })
+    ).resolves.toEqual(validPolicySnapshotResponseEnvelope.payload);
   });
 });

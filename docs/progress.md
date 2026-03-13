@@ -80,3 +80,30 @@
 - what was tested: `npm run typecheck`; targeted Vitest coverage for proof-store persistence/summary, main IPC proof handlers, preload proof IPC validation, IPC boundary envelopes, schema registry additions, and renderer proof-gate surfaces.
 - current status: Phase 6 is in progress. The proof gate now exists locally and is measurable, but advanced routing, durable memory, optional providers, challenger logic, and quota expansion remain deferred behind that proof gate.
 - next step: Use the recorded proof data to validate the current golden workflow over real local journeys, then only broaden into advanced routing or optional systems once the evidence is sufficient.
+
+## 2026-03-12 Phase 6 Slice B
+
+- what changed: Added a pure local proof-gate evaluator, extended the proof-summary contract with `gate_status`, surfaced the local verdict plus blocking reasons in Settings, and added evaluator coverage for `collecting_evidence`, `blocked`, and `candidate_ready`.
+- why it changed: Phase 6 still blocks broader routing and optional systems until the measured proof becomes actionable; the smallest correct next step was to turn local metrics into an explicit conservative readiness decision instead of a manual interpretation burden.
+- files touched: `src/core/schemas/contracts.ts`, `src/core/proof/proof-gate-evaluator.ts`, `src/core/proof/workflow-proof-store.ts`, `src/shared/ipc.ts`, `src/renderer/desktop-api.ts`, `src/renderer/pages/settings-page.tsx`, `src/index.ts`, `tests/proof/proof-gate-evaluator.test.ts`, `tests/proof/workflow-proof-store.test.ts`, `tests/main/ipc.test.ts`, `tests/contracts/schemas.test.ts`, `tests/renderer/app-shell.test.tsx`, `tests/fixtures.ts`, `docs/constitution.md`, `docs/task_plan.md`, `docs/progress.md`, `docs/findings.md`
+- what was tested: `npm run typecheck`; targeted Vitest coverage for the pure evaluator, proof-store summary output, main IPC proof-summary responses, preload proof IPC validation, IPC boundary envelopes, schema registry additions, and renderer Settings proof-gate rendering.
+- current status: Phase 6 remains in progress. The proof gate is now evaluative as well as measurable, but expansion into routing, durable memory, optional providers, challenger logic, and quota/backpressure work is still blocked on real local evidence.
+- next step: Collect real local golden-workflow journeys against the evaluator, then only open the first broader Phase 6 expansion once the gate reaches `candidate_ready`.
+
+## 2026-03-12 Phase 6 Slice C
+
+- what changed: Added the remaining proof-gate speed metrics by extending policy snapshot with app startup time, extending workflow-proof records with composer-ready, cold-start, and preview-to-approval timing, extending summaries with cold-start / preview-to-approval / repeat-task medians, and surfacing those metrics in Settings. The proof-gate evaluator now also checks preview-to-approval trend and resumed task-to-preview speed against the golden-workflow baseline.
+- why it changed: The master sheet explicitly requires cold start to usable composer, preview-to-approval latency, and repeat-task speed with context reuse to be tracked before broader expansion. This was the smallest correct increment that completed those missing speed gates without opening routing or durable memory early.
+- files touched: `src/core/schemas/contracts.ts`, `src/shared/ipc.ts`, `src/main/ipc.ts`, `src/main/index.ts`, `src/core/proof/workflow-proof-store.ts`, `src/core/proof/proof-gate-evaluator.ts`, `src/renderer/app.tsx`, `src/renderer/desktop-api.ts`, `src/renderer/pages/settings-page.tsx`, `tests/fixtures.ts`, `tests/proof/proof-gate-evaluator.test.ts`, `tests/proof/workflow-proof-store.test.ts`, `tests/main/ipc.test.ts`, `tests/preload/bridge.test.ts`, `tests/renderer/app-shell.test.tsx`, `docs/constitution.md`, `docs/task_plan.md`, `docs/progress.md`, `docs/findings.md`
+- what was tested: `npm run typecheck`; targeted Vitest coverage for the new speed-gate fields through evaluator, store, main IPC, preload policy snapshot validation, schema contracts, IPC envelopes, and renderer Settings rendering.
+- current status: Phase 6 remains in progress. The proof gate now tracks the full required speed-gate set locally, but broader expansion is still blocked until real local workflow evidence satisfies the gate.
+- next step: Gather real local golden-workflow journeys and verify whether the gate reaches `candidate_ready`; only then begin the first inspectable advanced-routing increment.
+
+## 2026-03-12 Phase 6 Slice D
+
+- what changed: Extended every proof-gate criterion with typed evidence metadata, including sample windows, required counts, success counts, recent/previous medians, and threshold medians, then replaced the prose-only Settings proof section with a structured local evidence board that shows exactly why the gate is still collecting evidence or blocked.
+- why it changed: The proof gate could already produce a verdict, but it still hid too much of the underlying evidence. The smallest correct next step was to make the gate numerically inspectable so real local journeys can be judged without broadening routing or optional systems early.
+- files touched: `src/core/schemas/contracts.ts`, `src/core/proof/proof-gate-evaluator.ts`, `src/renderer/desktop-api.ts`, `src/renderer/pages/settings-page.tsx`, `tests/fixtures.ts`, `tests/proof/proof-gate-evaluator.test.ts`, `tests/renderer/app-shell.test.tsx`, `docs/constitution.md`, `docs/task_plan.md`, `docs/progress.md`, `docs/findings.md`
+- what was tested: `npm run typecheck`; targeted Vitest coverage for the widened criterion schema, evaluator evidence metadata, and renderer Settings evidence-board rendering.
+- current status: Phase 6 remains in progress. The proof gate is now measurable, evaluative, and inspectable, but broader expansion still remains blocked on real local evidence.
+- next step: Use the live app to gather real local golden-workflow journeys and watch the evidence board converge toward `candidate_ready`; only then open advanced routing.

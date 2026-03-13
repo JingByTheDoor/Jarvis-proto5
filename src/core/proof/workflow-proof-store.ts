@@ -8,11 +8,14 @@ import {
   type EncryptedAtRestProvider
 } from "../persistence/encrypted-at-rest";
 import {
+  WorkflowProofGateStatusSchema,
   WorkflowProofRecordSchema,
   WorkflowProofSummarySchema,
+  type WorkflowProofGateStatus,
   type WorkflowProofRecord,
   type WorkflowProofSummary
 } from "../schemas";
+import { evaluateWorkflowProofGate } from "./proof-gate-evaluator";
 
 const WorkflowProofStoreEnvelopeSchema = z
   .object({
@@ -25,6 +28,7 @@ type WorkflowProofStoreEnvelope = z.infer<typeof WorkflowProofStoreEnvelopeSchem
 
 export interface WorkflowProofSummarySnapshot {
   readonly summary: WorkflowProofSummary;
+  readonly gate_status: WorkflowProofGateStatus;
   readonly recent_journeys: WorkflowProofRecord[];
 }
 
@@ -88,9 +92,21 @@ function summarizeWorkflowProofRecords(
       goldenWorkflowRecords.length === 0
         ? 0
         : Number((reviewReadyCount / goldenWorkflowRecords.length).toFixed(2)),
+    median_cold_start_to_composer_ms: median(
+      records.flatMap((record) =>
+        typeof record.cold_start_to_composer_ms === "number"
+          ? [record.cold_start_to_composer_ms]
+          : []
+      )
+    ),
     median_task_to_preview_ms: median(
       goldenWorkflowRecords.flatMap((record) =>
         typeof record.task_to_preview_ms === "number" ? [record.task_to_preview_ms] : []
+      )
+    ),
+    median_preview_to_approval_ms: median(
+      goldenWorkflowRecords.flatMap((record) =>
+        typeof record.preview_to_approval_ms === "number" ? [record.preview_to_approval_ms] : []
       )
     ),
     median_approval_to_first_result_ms: median(
@@ -112,6 +128,13 @@ function summarizeWorkflowProofRecords(
     ),
     median_operator_click_count: median(
       goldenWorkflowRecords.map((record) => record.operator_click_count)
+    ),
+    median_repeat_task_to_preview_ms: median(
+      goldenWorkflowRecords.flatMap((record) =>
+        record.resume_used && typeof record.task_to_preview_ms === "number"
+          ? [record.task_to_preview_ms]
+          : []
+      )
     ),
     resume_journeys: resumeJourneys.length,
     resume_review_ready: resumeJourneys.filter(
@@ -155,6 +178,9 @@ export class EncryptedWorkflowProofStore implements WorkflowProofStore {
 
     return {
       summary: summarizeWorkflowProofRecords(orderedRecords),
+      gate_status: WorkflowProofGateStatusSchema.parse(
+        evaluateWorkflowProofGate(orderedRecords)
+      ),
       recent_journeys: orderedRecords.slice(0, limit)
     };
   }

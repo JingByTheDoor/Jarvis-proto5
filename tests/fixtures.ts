@@ -11,6 +11,7 @@ import type {
   RunEvent,
   RunLog,
   ToolResult,
+  WorkflowProofGateStatus,
   WorkflowProofRecord
 } from "../src/core/schemas";
 import type {
@@ -26,6 +27,7 @@ import type {
 export const ISO_NOW = "2026-03-11T18:00:00.000Z";
 export const ISO_LATER = "2026-03-11T19:00:00.000Z";
 export const ISO_EXPIRY = "2026-03-11T20:00:00.000Z";
+export const ISO_APP_STARTED = "2026-03-11T17:59:59.500Z";
 
 export const WORKSPACE_ROOT = "D:\\Jarvis-proto5 repo\\Jarvis-proto5";
 export const README_PATH = `${WORKSPACE_ROOT}\\README.md`;
@@ -342,10 +344,13 @@ export const validWorkflowProofRecord: WorkflowProofRecord = {
   approval_required: true,
   resume_used: true,
   resumed_from_recall_id: "run:run-1",
+  composer_ready_at: ISO_NOW,
+  cold_start_to_composer_ms: 500,
   preview_requested_at: ISO_NOW,
   preview_ready_at: "2026-03-11T18:00:01.000Z",
   task_to_preview_ms: 1000,
   approval_recorded_at: "2026-03-11T18:00:03.000Z",
+  preview_to_approval_ms: 2000,
   execute_requested_at: "2026-03-11T18:00:04.000Z",
   first_result_at: "2026-03-11T18:00:05.000Z",
   approval_to_first_result_ms: 2000,
@@ -358,20 +363,126 @@ export const validWorkflowProofRecord: WorkflowProofRecord = {
   updated_at: ISO_LATER
 };
 
+export const validWorkflowProofGateStatus: WorkflowProofGateStatus = {
+  overall_status: "collecting_evidence",
+  blocking_reasons: [
+    "Need at least 3 recent golden edit journeys before stability can be judged.",
+    "Need 6 task-to-preview samples before a local trend can be compared.",
+    "Need 6 preview-to-approval samples before a local trend can be compared.",
+    "Need 6 approval-to-first-result samples before a local trend can be compared.",
+    "Need 6 workflow-step samples before a local trend can be compared.",
+    "Need 6 operator-click samples before a local trend can be compared."
+  ],
+  stability: {
+    status: "not_enough_data",
+    detail: "Need at least 3 recent golden edit journeys before stability can be judged.",
+    sample_count: 1,
+    required_sample_count: 3,
+    satisfied_count: 1,
+    required_satisfied_count: 3,
+    recent_median: null,
+    previous_median: null,
+    threshold_median: null
+  },
+  task_to_preview_trend: {
+    status: "not_enough_data",
+    detail: "Need 6 task-to-preview samples before a local trend can be compared.",
+    sample_count: 1,
+    required_sample_count: 6,
+    satisfied_count: null,
+    required_satisfied_count: null,
+    recent_median: null,
+    previous_median: null,
+    threshold_median: null
+  },
+  preview_to_approval_trend: {
+    status: "not_enough_data",
+    detail: "Need 6 preview-to-approval samples before a local trend can be compared.",
+    sample_count: 1,
+    required_sample_count: 6,
+    satisfied_count: null,
+    required_satisfied_count: null,
+    recent_median: null,
+    previous_median: null,
+    threshold_median: null
+  },
+  approval_to_first_result_trend: {
+    status: "not_enough_data",
+    detail: "Need 6 approval-to-first-result samples before a local trend can be compared.",
+    sample_count: 1,
+    required_sample_count: 6,
+    satisfied_count: null,
+    required_satisfied_count: null,
+    recent_median: null,
+    previous_median: null,
+    threshold_median: null
+  },
+  step_count_trend: {
+    status: "not_enough_data",
+    detail: "Need 6 workflow-step samples before a local trend can be compared.",
+    sample_count: 1,
+    required_sample_count: 6,
+    satisfied_count: null,
+    required_satisfied_count: null,
+    recent_median: null,
+    previous_median: null,
+    threshold_median: 4
+  },
+  click_count_trend: {
+    status: "not_enough_data",
+    detail: "Need 6 operator-click samples before a local trend can be compared.",
+    sample_count: 1,
+    required_sample_count: 6,
+    satisfied_count: null,
+    required_satisfied_count: null,
+    recent_median: null,
+    previous_median: null,
+    threshold_median: 5
+  },
+  repeat_task_speed: {
+    status: "on_track",
+    detail: "Resumed task-to-preview median (1000) is no worse than the overall golden-workflow median (1000).",
+    sample_count: 1,
+    required_sample_count: 1,
+    satisfied_count: null,
+    required_satisfied_count: null,
+    recent_median: 1000,
+    previous_median: 1000,
+    threshold_median: null
+  },
+  resume_helpfulness: {
+    status: "on_track",
+    detail: "At least one resumed journey reached review_ready.",
+    sample_count: 1,
+    required_sample_count: 1,
+    satisfied_count: 1,
+    required_satisfied_count: 1,
+    recent_median: null,
+    previous_median: null,
+    threshold_median: null
+  },
+  assumption_note:
+    "Assumption: candidate_ready requires at least 3 recent golden edit journeys, 1 resumed review_ready journey, 6 qualifying samples for trend checks, resumed task-to-preview speed no worse than the overall golden-workflow median, and recent medians at or below 4 workflow steps and 5 operator clicks."
+};
+
 export const validWorkflowProofSummaryResponse: WorkflowProofSummaryResponse = {
   summary: {
     golden_workflow_attempts: 1,
     golden_workflow_review_ready: 1,
     golden_workflow_stability_rate: 1,
+    median_cold_start_to_composer_ms: 500,
     median_task_to_preview_ms: 1000,
+    median_preview_to_approval_ms: 2000,
     median_approval_to_first_result_ms: 2000,
     median_execute_to_first_result_ms: 1000,
     median_workflow_step_count: 4,
     median_operator_click_count: 4,
+    median_repeat_task_to_preview_ms: 1000,
     resume_journeys: 1,
     resume_review_ready: 1,
     latest_updated_at: ISO_LATER
   },
+  gate_status: validWorkflowProofGateStatus,
   recent_journeys: [validWorkflowProofRecord]
 };
 
@@ -466,7 +577,8 @@ export const validPolicySnapshotResponseEnvelope = {
     version: "phase-6-proof-gate",
     workflow: validPolicySnapshot.workflow,
     local_first: true as const,
-    approval_required_for_risky_actions: true as const
+    approval_required_for_risky_actions: true as const,
+    app_started_at: ISO_APP_STARTED
   }
 };
 

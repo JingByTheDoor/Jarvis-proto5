@@ -13,6 +13,7 @@ const distDirectory = path.resolve(moduleDirectory, "..");
 const preloadPath = path.join(distDirectory, "preload", "index.js");
 const rendererDirectory = path.join(distDirectory, "renderer");
 const smokeTestMode = process.argv.includes("--smoke-test");
+const appStartedAt = new Date().toISOString();
 
 function createMainWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow(
@@ -49,6 +50,7 @@ async function bootstrap(): Promise<void> {
   applyDefaultSessionGuards(session.defaultSession);
   registerShellIpcHandlers(ipcMain, {
     now: () => new Date().toISOString(),
+    appStartedAt,
     publishRunEvent: (event) => {
       for (const browserWindow of BrowserWindow.getAllWindows()) {
         if (!browserWindow.isDestroyed()) {

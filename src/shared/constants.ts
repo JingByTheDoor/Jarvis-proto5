@@ -252,3 +252,17 @@ export const workflowJourneyKinds = [
   "unsupported_workflow"
 ] as const;
 export type WorkflowJourneyKind = (typeof workflowJourneyKinds)[number];
+
+export const proofGateCriterionStatuses = [
+  "not_enough_data",
+  "on_track",
+  "attention_needed"
+] as const;
+export type ProofGateCriterionStatus = (typeof proofGateCriterionStatuses)[number];
+
+export const proofGateOverallStatuses = [
+  "collecting_evidence",
+  "blocked",
+  "candidate_ready"
+] as const;
+export type ProofGateOverallStatus = (typeof proofGateOverallStatuses)[number];
